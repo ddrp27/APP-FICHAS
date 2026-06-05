@@ -1,0 +1,45 @@
+# Caché de Python
+__pycache__/
+*.py[cod]
+*$py.class
+backend/__pycache__/
+
+# Entornos virtuales
+venv/
+env/
+.venv/
+
+# Carpetas de empaquetado (PyInstaller)
+build/
+dist/
+*.spec
+
+# Dependencias de Node y compilaciones de Frontend
+node_modules/
+frontend/node_modules/
+frontend_dist/
+frontend/dist/
+.eslintcache
+
+# Archivos de salida y subidas locales
+uploads/
+output/
+backend/uploads/
+backend/output/
+
+# Excluir todos los excels de prueba, pero incluir obligatoriamente las plantillas
+*.xlsm
+!templates/*.xlsm
+
+# Metadatos del sistema operativo
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Variables de entorno locales
+.env
+.env.local

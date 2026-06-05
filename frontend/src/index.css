@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+:root {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #fdfcfd;
+  background-image: 
+    radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
+    radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
+    radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
+  background-attachment: fixed;
+  color: #0f172a;
+}
+
+@theme {
+  --color-brand-50: #f0f9ff;
+  --color-brand-100: #e0f2fe;
+  --color-brand-200: #bae6fd;
+  --color-brand-300: #7dd3fc;
+  --color-brand-400: #38bdf8;
+  --color-brand-500: #0ea5e9;
+  --color-brand-600: #0284c7;
+  --color-brand-700: #0369a1;
+  --color-brand-800: #075985;
+  --color-brand-900: #0c4a6e;
+}
+
+@layer components {
+  .creative-card {
+    @apply bg-white/90 backdrop-blur-md border border-white/20 shadow-[0_20px_50px_rgba(0,0,0,0.1)] rounded-[40px] p-12 transition-all duration-500;
+  }
+
+  .step-pill {
+    @apply px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all duration-300;
+  }
+
+  .pill-active {
+    @apply bg-indigo-600 text-white shadow-lg shadow-indigo-200;
+  }
+
+  .pill-inactive {
+    @apply bg-slate-100 text-slate-400;
+  }
+
+  .input-creative {
+    @apply w-full bg-slate-50/50 border-2 border-slate-100 rounded-2xl px-5 py-4 text-slate-900 outline-none transition-all duration-300 placeholder-slate-400 font-medium;
+  }
+
+  .input-creative:focus {
+    @apply border-indigo-400 bg-white ring-8 ring-indigo-50;
+  }
+
+  .label-creative {
+    @apply block text-sm font-bold text-slate-600 mb-3 ml-1;
+  }
+
+  .btn-creative {
+    @apply px-10 py-4 rounded-2xl font-extrabold text-sm uppercase tracking-widest transition-all duration-300 flex items-center gap-3;
+  }
+
+  .btn-next {
+    @apply bg-indigo-600 text-white hover:bg-indigo-700 shadow-xl shadow-indigo-100 active:scale-95;
+  }
+
+  .btn-back {
+    @apply bg-slate-100 text-slate-500 hover:bg-slate-200 active:scale-95;
+  }
+
+  .upload-area {
+    @apply relative border-4 border-dashed border-slate-100 rounded-[32px] bg-slate-50/50 flex flex-col items-center justify-center p-12 transition-all hover:border-indigo-300 hover:bg-indigo-50/30 cursor-pointer overflow-hidden;
+  }
+}
+
+/* Animations */
+.slide-up {
+  animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes progress {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(0); }
+  100% { transform: translateX(100%); }
+}
