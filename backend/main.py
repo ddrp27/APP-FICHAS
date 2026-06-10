@@ -43,7 +43,11 @@ def get_external_path(relative_path):
         base_path = os.path.dirname(sys.executable)
     else:
         # The application is running in a normal Python environment
-        base_path = os.path.abspath(".")
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        if os.path.basename(script_dir) == "backend":
+            base_path = os.path.dirname(script_dir)
+        else:
+            base_path = script_dir
     
     return os.path.join(base_path, relative_path)
 
