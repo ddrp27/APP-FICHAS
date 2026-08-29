@@ -4,7 +4,7 @@ import uuid
 import base64
 from datetime import datetime
 from typing import List, Optional
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import openpyxl
@@ -14,6 +14,10 @@ from PIL import Image as PILImage
 import io
 import queue
 import threading
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 HAS_TKINTER = True
 try:
@@ -547,7 +551,9 @@ def download_task_file(task_id: str):
         
     return FileResponse(path=out_path, filename=filename, media_type=media_type)
 
-# Serving React Frontend
+
+
+
 DIST_PATH = os.path.join(os.path.abspath("."), "frontend_dist")
 if not os.path.exists(DIST_PATH):
     DIST_PATH = get_resource_path("dist")

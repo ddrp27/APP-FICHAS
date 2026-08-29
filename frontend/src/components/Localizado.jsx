@@ -18,7 +18,6 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
 
   const fileInputRopero = useRef(null);
   const fileInputMolde = useRef(null);
-
   const [formData, setFormData] = useState({
     marca: '', dis_grafico: '', dis_moda: '', campana: '',
     anio: '', linea: '', proceso: '', tipo_logo: '',
@@ -31,6 +30,8 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
 
   const [colores, setColores] = useState([{ material: '', pantone: '', color: '' }]);
   const [images, setImages] = useState({ img_ropero_cad: null, img_pantallazo_molde: null });
+
+
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
