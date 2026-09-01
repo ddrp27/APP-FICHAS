@@ -14,6 +14,8 @@ from PIL import Image as PILImage
 import io
 import queue
 import threading
+import gc
+import shutil
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -172,12 +174,15 @@ def get_config():
 @app.get("/api/opciones")
 def get_opciones():
     global CACHED_OPCIONES
+    if CACHED_OPCIONES is not None:
+        return CACHED_OPCIONES
     try:
         if not os.path.exists(TEMPLATE_LOCALIZADO):
             raise HTTPException(status_code=500, detail=f"Template not found at {TEMPLATE_LOCALIZADO}")
             
         wb = openpyxl.load_workbook(TEMPLATE_LOCALIZADO, read_only=True, data_only=True)
         if "DATOS" not in wb.sheetnames:
+            wb.close()
             raise HTTPException(status_code=500, detail="Sheet 'DATOS' not found in template")
         
         ws = wb["DATOS"]
@@ -185,7 +190,9 @@ def get_opciones():
         for row in ws.iter_rows(min_row=1, max_row=1, values_only=True):
             headers = list(row)
             break
-        if not headers: return {}
+        if not headers:
+            wb.close()
+            return {}
 
         def get_col_index(name):
             try: return headers.index(name)
@@ -219,19 +226,25 @@ def get_opciones():
                 if idx != -1 and idx < len(row) and row[idx] is not None:
                     opciones[key].add(str(row[idx]))
 
+        wb.close()
         result = {k: sorted(list(v)) for k, v in opciones.items()}
         CACHED_OPCIONES = result
+        gc.collect()
         return result
     except Exception as e:
         print(f"Error reading options: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+CACHED_COMPOSITION = None
+
 def get_composition_mapping():
+    global CACHED_COMPOSITION
+    if CACHED_COMPOSITION is not None:
+        return CACHED_COMPOSITION
     try:
         if not os.path.exists(TEMPLATE_CONTINUA):
             return {}
         wb = openpyxl.load_workbook(TEMPLATE_CONTINUA, read_only=True, data_only=True)
-        # Try to find a sheet with composition mapping or the second sheet
         sheet_name = '  '
         if sheet_name not in wb.sheetnames:
             sheet_name = wb.sheetnames[1] if len(wb.sheetnames) > 1 else wb.sheetnames[0]
@@ -241,6 +254,9 @@ def get_composition_mapping():
         for row in ws.iter_rows(min_row=2, values_only=True):
             if len(row) >= 3 and row[1] and row[2]:
                 mapping[str(row[1]).strip()] = str(row[2]).strip()
+        wb.close()
+        CACHED_COMPOSITION = mapping
+        gc.collect()
         return mapping
     except Exception as e:
         print(f"Error reading composition mapping: {e}")
@@ -318,9 +334,11 @@ def generar_ficha_core(data: FichaData) -> tuple[str, str]:
     
     os.makedirs(out_dir, exist_ok=True)
     wb.save(out_path)
+    wb.close()
 
     if os.path.exists(path_ropero): os.remove(path_ropero)
     if os.path.exists(path_molde): os.remove(path_molde)
+    gc.collect()
 
     return out_path, filename
 
@@ -397,6 +415,10 @@ def generar_continuo_core(req: ContinuoRequest) -> tuple[str, int]:
         wb.save(save_path)
         wb.close()
         
+    if os.path.exists(path_pattern):
+        os.remove(path_pattern)
+    gc.collect()
+
     return folder_path, len(telas)
 
 
@@ -426,7 +448,6 @@ def task_worker():
                 task["filename"] = filename
             elif task["tipo"] == "CONTINUO":
                 folder_path, count = generar_continuo_core(task["data"])
-                import shutil
                 # Create zip archive of the folder
                 zip_path = shutil.make_archive(folder_path, 'zip', folder_path)
                 task["estado"] = "completed"
@@ -441,6 +462,7 @@ def task_worker():
         finally:
             task["fin"] = datetime.now().isoformat()
             task_queue.task_done()
+            gc.collect()
 
 # Start background thread
 worker_thread = threading.Thread(target=task_worker, daemon=True)

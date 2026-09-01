@@ -46,3 +46,5 @@ Thumbs.db
 
 # Archivos de respaldo (Backups)
 *.bak
+*.bak*
+*.original_bak
