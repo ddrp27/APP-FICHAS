@@ -262,13 +262,32 @@ def get_composition_mapping():
         print(f"Error reading composition mapping: {e}")
         return {}
 
-def save_base64_image(base64_str, folder, filename):
+def save_base64_image(base64_str: str, folder: str, filename: str, max_dim: int = 1200) -> str:
+    """ Decodes, downsamples and optimizes base64 image to prevent high RAM spikes """
     if "," in base64_str:
         base64_str = base64_str.split(",")[1]
-    img_data = base64.b64decode(base64_str)
+    raw_data = base64.b64decode(base64_str)
     filepath = os.path.join(folder, filename)
-    with open(filepath, "wb") as f:
-        f.write(img_data)
+    
+    try:
+        with PILImage.open(io.BytesIO(raw_data)) as img:
+            w, h = img.size
+            if max(w, h) > max_dim:
+                scale = max_dim / max(w, h)
+                new_w, new_h = max(1, int(w * scale)), max(1, int(h * scale))
+                img = img.resize((new_w, new_h), PILImage.Resampling.LANCZOS)
+            
+            if img.mode in ("RGBA", "LA", "P"):
+                img.save(filepath, format="PNG", optimize=True)
+            else:
+                if img.mode != "RGB":
+                    img = img.convert("RGB")
+                img.save(filepath, format="JPEG", quality=85, optimize=True)
+    except Exception as e:
+        print(f"Image optimization fallback: {e}")
+        with open(filepath, "wb") as f:
+            f.write(raw_data)
+            
     return filepath
 
 def generar_ficha_core(data: FichaData) -> tuple[str, str]:
@@ -276,71 +295,73 @@ def generar_ficha_core(data: FichaData) -> tuple[str, str]:
     ficha_folder = os.path.join(UPLOADS_DIR, ficha_id)
     os.makedirs(ficha_folder, exist_ok=True)
 
-    path_ropero = save_base64_image(data.img_ropero_cad, ficha_folder, "ropero.png")
-    path_molde = save_base64_image(data.img_pantallazo_molde, ficha_folder, "molde.png")
+    try:
+        path_ropero = save_base64_image(data.img_ropero_cad, ficha_folder, "ropero.png")
+        path_molde = save_base64_image(data.img_pantallazo_molde, ficha_folder, "molde.png")
 
-    wb = openpyxl.load_workbook(TEMPLATE_LOCALIZADO, keep_vba=True)
-    ws = wb["FICHA"]
+        wb = openpyxl.load_workbook(TEMPLATE_LOCALIZADO, keep_vba=True)
+        ws = wb["FICHA"]
 
-    MAPEO_FICHA = {
-        "marca": "B5", "dis_grafico": "D5", "dis_moda": "H5", "campana": "E3",
-        "anio": "G3", "linea": "I3", "proceso": "I4", "tipo_logo": "K5",
-        "pieza": "B7", "foil": "K7",
-        "referencia": "C3", "tela_base": "B6", "num_piezas": "F7",
-        "porc_cubrimiento": "I7", "alta_densi": "B8", "fecha_ficha": "K8",
-        "ancho_cm": "B21", "alto_cm": "B22", "num_estampados": "B23", 
-        "observaciones": "H31"
-    }
+        MAPEO_FICHA = {
+            "marca": "B5", "dis_grafico": "D5", "dis_moda": "H5", "campana": "E3",
+            "anio": "G3", "linea": "I3", "proceso": "I4", "tipo_logo": "K5",
+            "pieza": "B7", "foil": "K7",
+            "referencia": "C3", "tela_base": "B6", "num_piezas": "F7",
+            "porc_cubrimiento": "I7", "alta_densi": "B8", "fecha_ficha": "K8",
+            "ancho_cm": "B21", "alto_cm": "B22", "num_estampados": "B23", 
+            "observaciones": "H31"
+        }
 
-    from openpyxl.cell.cell import MergedCell
-    def write_to_cell(sheet, coord, value):
-        cell = sheet[coord]
-        if isinstance(cell, MergedCell):
-            for m_range in sheet.merged_cells.ranges:
-                if coord in m_range:
-                    sheet.cell(row=m_range.min_row, column=m_range.min_col).value = value
-                    return
-        cell.value = value
+        from openpyxl.cell.cell import MergedCell
+        def write_to_cell(sheet, coord, value):
+            cell = sheet[coord]
+            if isinstance(cell, MergedCell):
+                for m_range in sheet.merged_cells.ranges:
+                    if coord in m_range:
+                        sheet.cell(row=m_range.min_row, column=m_range.min_col).value = value
+                        return
+            cell.value = value
 
-    for key, cell in MAPEO_FICHA.items():
-        if hasattr(data, key):
-            val = getattr(data, key)
-            write_to_cell(ws, cell, val)
+        for key, cell in MAPEO_FICHA.items():
+            if hasattr(data, key):
+                val = getattr(data, key)
+                write_to_cell(ws, cell, val)
 
-    def add_image(ws, path, cell, size=(300, 300)):
-        img = Image(path)
-        with PILImage.open(path) as pil_img:
-            width, height = pil_img.size
-            ratio = min(size[0]/width, size[1]/height)
-            img.width = width * ratio
-            img.height = height * ratio
-        img.anchor = cell
-        ws.add_image(img)
+        def add_image(ws, path, cell, size=(300, 300)):
+            img = Image(path)
+            with PILImage.open(path) as pil_img:
+                width, height = pil_img.size
+                ratio = min(size[0]/width, size[1]/height)
+                img.width = width * ratio
+                img.height = height * ratio
+            img.anchor = cell
+            ws.add_image(img)
 
-    add_image(ws, path_ropero, "B12", size=(280, 350))
-    add_image(ws, path_molde, "H12", size=(550, 450))
+        add_image(ws, path_ropero, "B12", size=(280, 350))
+        add_image(ws, path_molde, "H12", size=(550, 450))
 
-    start_row = 30
-    for i, color in enumerate(data.colores[:12]):
-        row_idx = start_row + i
-        write_to_cell(ws, f"A{row_idx}", color.material)
-        write_to_cell(ws, f"B{row_idx}", color.pantone)
-        write_to_cell(ws, f"C{row_idx}", color.color)
+        start_row = 30
+        for i, color in enumerate(data.colores[:12]):
+            row_idx = start_row + i
+            write_to_cell(ws, f"A{row_idx}", color.material)
+            write_to_cell(ws, f"B{row_idx}", color.pantone)
+            write_to_cell(ws, f"C{row_idx}", color.color)
 
-    clean_ref = "".join(x for x in data.referencia if x.isalnum())
-    filename = f"{clean_ref}.xlsm" if clean_ref else "Ficha.xlsm"
-    out_dir = data.output_folder if data.output_folder and os.path.isdir(data.output_folder) else OUTPUT_DIR
-    out_path = os.path.join(out_dir, filename)
-    
-    os.makedirs(out_dir, exist_ok=True)
-    wb.save(out_path)
-    wb.close()
+        clean_ref = "".join(x for x in data.referencia if x.isalnum())
+        filename = f"{clean_ref}.xlsm" if clean_ref else "Ficha.xlsm"
+        out_dir = data.output_folder if data.output_folder and os.path.isdir(data.output_folder) else OUTPUT_DIR
+        out_path = os.path.join(out_dir, filename)
+        
+        os.makedirs(out_dir, exist_ok=True)
+        wb.save(out_path)
+        wb.close()
+        del wb
+        del ws
 
-    if os.path.exists(path_ropero): os.remove(path_ropero)
-    if os.path.exists(path_molde): os.remove(path_molde)
-    gc.collect()
-
-    return out_path, filename
+        return out_path, filename
+    finally:
+        shutil.rmtree(ficha_folder, ignore_errors=True)
+        gc.collect()
 
 
 def generar_continuo_core(req: ContinuoRequest) -> tuple[str, int]:
@@ -353,25 +374,14 @@ def generar_continuo_core(req: ContinuoRequest) -> tuple[str, int]:
         "observaciones": "A20"
     }
     
-    # Determine output directory
     out_root = data.output_folder if data.output_folder and os.path.isdir(data.output_folder) else OUTPUT_DIR
     folder_name = f"Continuo_{data.referencia}"
     folder_path = os.path.join(out_root, folder_name)
     os.makedirs(folder_path, exist_ok=True)
     
-    # Clean base64 header if present
-    base64_str = data.imagen_pattern_base64
-    if "," in base64_str:
-        base64_str = base64_str.split(",")[1]
-        
-    path_pattern = save_base64_image(base64_str, folder_path, "pattern_base.png")
-    
-    comp_mapping = get_composition_mapping()
+    path_pattern = save_base64_image(data.imagen_pattern_base64, folder_path, "pattern_base.png")
 
-    for tela in telas:
-        wb = openpyxl.load_workbook(TEMPLATE_CONTINUA, keep_vba=True)
-        ws = wb["FICHA"] if "FICHA" in wb.sheetnames else wb.active
-        
+    try:
         from openpyxl.cell.cell import MergedCell
         def write_cell(sheet, coord, val):
             cell = sheet[coord]
@@ -382,49 +392,65 @@ def generar_continuo_core(req: ContinuoRequest) -> tuple[str, int]:
                         return
             cell.value = val
 
-        for key, cell in MAPEO_CELDAS.items():
-            val = getattr(data, key)
-            write_cell(ws, cell, val)
-        
-        write_cell(ws, "H3", tela.nombre_tela)
-        
-        try:
-            img = Image(path_pattern)
-            with PILImage.open(path_pattern) as pil_img:
-                w, h = pil_img.size
-                target_w, target_h = 380, 280 
-                ratio = min(target_w/w, target_h/h)
-                img.width = w * ratio
-                img.height = h * ratio
-            ws.add_image(img, "B11")
-        except Exception as img_e:
-            print(f"Error insertando imagen: {img_e}")
-        
-        if data.proceso == "SUBLIMACION":
-            for row in range(11, 21): write_cell(ws, f"H{row}", None)
-        else: # ESTAMPACION
-            if tela.pantones:
-                for i, p in enumerate(tela.pantones):
-                    if i < 10: write_cell(ws, f"H{11+i}", p)
-        
-        safe_tela = "".join(x for x in tela.nombre_tela if x.isalnum())[:30]
-        safe_ref = "".join(x for x in data.referencia if x.isalnum())[:20]
-        filename = f"F_{safe_ref}_{safe_tela}.xlsm"
-        
-        save_path = os.path.join(folder_path, filename)
-        wb.save(save_path)
-        wb.close()
-        
-    if os.path.exists(path_pattern):
-        os.remove(path_pattern)
-    gc.collect()
-
-    return folder_path, len(telas)
+        for tela in telas:
+            wb = openpyxl.load_workbook(TEMPLATE_CONTINUA, keep_vba=True)
+            ws = wb["FICHA"] if "FICHA" in wb.sheetnames else wb.active
+            
+            for key, cell in MAPEO_CELDAS.items():
+                val = getattr(data, key)
+                write_cell(ws, cell, val)
+            
+            write_cell(ws, "H3", tela.nombre_tela)
+            
+            try:
+                img = Image(path_pattern)
+                with PILImage.open(path_pattern) as pil_img:
+                    w, h = pil_img.size
+                    target_w, target_h = 380, 280 
+                    ratio = min(target_w/w, target_h/h)
+                    img.width = w * ratio
+                    img.height = h * ratio
+                ws.add_image(img, "B11")
+            except Exception as img_e:
+                print(f"Error insertando imagen: {img_e}")
+            
+            if data.proceso == "SUBLIMACION":
+                for row in range(11, 21): write_cell(ws, f"H{row}", None)
+            else: # ESTAMPACION
+                if tela.pantones:
+                    for i, p in enumerate(tela.pantones):
+                        if i < 10: write_cell(ws, f"H{11+i}", p)
+            
+            safe_tela = "".join(x for x in tela.nombre_tela if x.isalnum())[:30]
+            safe_ref = "".join(x for x in data.referencia if x.isalnum())[:20]
+            filename = f"F_{safe_ref}_{safe_tela}.xlsm"
+            
+            save_path = os.path.join(folder_path, filename)
+            wb.save(save_path)
+            wb.close()
+            del wb
+            del ws
+            gc.collect()
+            
+        return folder_path, len(telas)
+    finally:
+        if os.path.exists(path_pattern):
+            os.remove(path_pattern)
+        gc.collect()
 
 
 # BACKGROUND TASK QUEUE AND WORKER
 TASKS_DB = {}
 task_queue = queue.Queue()
+
+def prune_tasks():
+    """ Keeps only the last 20 tasks in memory to prevent RAM accumulation """
+    global TASKS_DB
+    if len(TASKS_DB) > 20:
+        sorted_keys = sorted(TASKS_DB.keys(), key=lambda k: TASKS_DB[k].get("timestamp", ""), reverse=True)
+        keys_to_remove = sorted_keys[20:]
+        for k in keys_to_remove:
+            TASKS_DB.pop(k, None)
 
 def task_worker():
     while True:
@@ -441,14 +467,14 @@ def task_worker():
         task["inicio"] = datetime.now().isoformat()
         
         try:
+            task_data = task.get("data")
             if task["tipo"] == "LOCALIZADO":
-                out_path, filename = generar_ficha_core(task["data"])
+                out_path, filename = generar_ficha_core(task_data)
                 task["estado"] = "completed"
                 task["out_path"] = out_path
                 task["filename"] = filename
             elif task["tipo"] == "CONTINUO":
-                folder_path, count = generar_continuo_core(task["data"])
-                # Create zip archive of the folder
+                folder_path, count = generar_continuo_core(task_data)
                 zip_path = shutil.make_archive(folder_path, 'zip', folder_path)
                 task["estado"] = "completed"
                 task["out_path"] = folder_path
@@ -461,6 +487,7 @@ def task_worker():
             task["error"] = str(e)
         finally:
             task["fin"] = datetime.now().isoformat()
+            task["data"] = None  # Crucial: Immediately free heavy base64 payload from RAM!
             task_queue.task_done()
             gc.collect()
 
@@ -494,6 +521,7 @@ def generar_continuo(req: ContinuoRequest):
 @app.post("/api/generar-ficha-async")
 def generar_ficha_async(data: FichaData):
     try:
+        prune_tasks()
         task_id = str(uuid.uuid4())
         TASKS_DB[task_id] = {
             "id": task_id,
@@ -513,6 +541,7 @@ def generar_ficha_async(data: FichaData):
 @app.post("/api/generar-continuo-async")
 def generar_continuo_async(req: ContinuoRequest):
     try:
+        prune_tasks()
         task_id = str(uuid.uuid4())
         TASKS_DB[task_id] = {
             "id": task_id,
