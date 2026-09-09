@@ -227,6 +227,20 @@ def get_opciones():
                     opciones[key].add(str(row[idx]))
 
         wb.close()
+
+        # Also merge any additional fabrics from TEMPLATE_CONTINUA into tela_base
+        if os.path.exists(TEMPLATE_CONTINUA):
+            try:
+                wb_c = openpyxl.load_workbook(TEMPLATE_CONTINUA, read_only=True, data_only=True)
+                sheet_c = '  ' if '  ' in wb_c.sheetnames else wb_c.sheetnames[0]
+                ws_c = wb_c[sheet_c]
+                for row in ws_c.iter_rows(min_row=2, values_only=True):
+                    if len(row) >= 2 and row[1]:
+                        opciones["tela_base"].add(str(row[1]).strip())
+                wb_c.close()
+            except Exception as e_c:
+                print(f"Warning reading extra fabrics from Continua template: {e_c}")
+
         result = {k: sorted(list(v)) for k, v in opciones.items()}
         CACHED_OPCIONES = result
         gc.collect()
