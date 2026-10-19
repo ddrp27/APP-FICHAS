@@ -5,7 +5,8 @@ import {
   AlertCircle, Loader2, Image as ImageIcon,
   Palette, ChevronRight, ChevronLeft,
   Download, MousePointer2,
-  Brush, Zap, Layout, Clock, Check
+  Brush, Zap, Layout, Clock, Check,
+  Sparkles, X, Upload
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.DEV ? 'http://localhost:8000/api' : '/api';
@@ -15,6 +16,12 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
   const [statusMsg, setStatusMsg] = useState('');
   const [message, setMessage] = useState(null);
   const [activeField, setActiveField] = useState(null);
+
+  // Cubrimiento calculation state
+  const [showCubrimientoModal, setShowCubrimientoModal] = useState(false);
+  const [analizandoCubrimiento, setAnalizandoCubrimiento] = useState(false);
+  const [cubrimientoInfo, setCubrimientoInfo] = useState(null);
+  const fileInputCubrimiento = useRef(null);
 
   const fileInputRopero = useRef(null);
   const fileInputMolde = useRef(null);
@@ -63,6 +70,30 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const procesarImagenCubrimiento = async (fileOrBlob) => {
+    setAnalizandoCubrimiento(true);
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      try {
+        const base64 = reader.result;
+        const res = await axios.post(`${API_BASE}/calcular-cubrimiento`, {
+          imagen_base64: base64
+        });
+        if (res.data && res.data.porcentaje_texto) {
+          setFormData(prev => ({ ...prev, porc_cubrimiento: res.data.porcentaje_texto }));
+          setCubrimientoInfo(res.data);
+          setShowCubrimientoModal(false);
+        }
+      } catch (err) {
+        console.error("Error calculando cubrimiento:", err);
+        alert("No se pudo calcular el cubrimiento. Verifica que la imagen sea válida.");
+      } finally {
+        setAnalizandoCubrimiento(false);
+      }
+    };
+    reader.readAsDataURL(fileOrBlob);
   };
 
   const handleSubmit = async () => {
@@ -218,7 +249,48 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
               </div>
               <div><label className="label-creative">Referencia</label><input type="text" name="referencia" className="input-creative" value={formData.referencia} onChange={handleInputChange} /></div>
               <div><label className="label-creative"># Piezas</label><input type="text" name="num_piezas" className="input-creative" value={formData.num_piezas} onChange={handleInputChange} /></div>
-              <div><label className="label-creative">% Cubrimiento</label><input type="text" name="porc_cubrimiento" className="input-creative" value={formData.porc_cubrimiento} onChange={handleInputChange} /></div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="label-creative mb-0">% Cubrimiento</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowCubrimientoModal(true)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 transition-colors shadow-sm"
+                    title="Calcular % automáticamente a partir del arte del estampado"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                    <span>Calcular con Arte</span>
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  name="porc_cubrimiento"
+                  className="input-creative w-full"
+                  value={formData.porc_cubrimiento}
+                  onChange={handleInputChange}
+                  placeholder="Ej: 25%"
+                  onPaste={(e) => {
+                    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+                    for (let i = 0; i < items.length; i++) {
+                      if (items[i].type.indexOf("image") !== -1) {
+                        const blob = items[i].getAsFile();
+                        if (blob) {
+                          e.preventDefault();
+                          procesarImagenCubrimiento(blob);
+                        }
+                      }
+                    }
+                  }}
+                />
+                {cubrimientoInfo && (
+                  <p className="text-[10px] text-emerald-600 font-bold mt-1.5 flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5" />
+                    <span>
+                      Calculado: {cubrimientoInfo.porcentaje_texto} (Real: {cubrimientoInfo.porcentaje_real}% • Fondo: {cubrimientoInfo.tiene_transparencia ? "Transparente" : cubrimientoInfo.color_fondo_hex})
+                    </span>
+                  </p>
+                )}
+              </div>
               <div>
                 <label className="label-creative"># Estampados</label>
                 <select name="num_estampados" className="input-creative appearance-none" value={formData.num_estampados} onChange={handleInputChange}>
@@ -310,6 +382,87 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
           </div>
         )}
       </div>
+
+      {/* Modal para calcular cubrimiento */}
+      {showCubrimientoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-100 relative slide-up">
+            <button
+              type="button"
+              onClick={() => setShowCubrimientoModal(false)}
+              className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 transition-colors p-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-sm">
+                <Sparkles className="w-6 h-6 text-indigo-600" />
+              </div>
+              <div>
+                <h3 className="font-outfit text-xl font-black text-slate-900 tracking-tight">Calcular % Cubrimiento</h3>
+                <p className="text-xs text-slate-400 font-medium">Detecta fondo transparente o sólido (CMYK/RGB)</p>
+              </div>
+            </div>
+
+            <div
+              className="upload-area h-56 flex flex-col items-center justify-center cursor-pointer border-2 border-dashed border-indigo-200 hover:border-indigo-400 rounded-3xl p-6 transition-all bg-indigo-50/20 outline-none"
+              onClick={() => fileInputCubrimiento.current?.click()}
+              onPaste={(e) => {
+                const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+                for (let i = 0; i < items.length; i++) {
+                  if (items[i].type.indexOf("image") !== -1) {
+                    const blob = items[i].getAsFile();
+                    if (blob) procesarImagenCubrimiento(blob);
+                  }
+                }
+              }}
+              tabIndex="0"
+            >
+              {analizandoCubrimiento ? (
+                <div className="flex flex-col items-center text-center">
+                  <Loader2 className="w-10 h-10 text-indigo-600 animate-spin mb-3" />
+                  <p className="font-bold text-sm text-slate-800">Analizando cobertura de color...</p>
+                  <p className="text-xs text-slate-400 mt-1">Calculando píxeles de tinta y descartando fondo</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-12 h-12 bg-white shadow-md rounded-2xl flex items-center justify-center mb-3">
+                    <Upload className="w-6 h-6 text-indigo-500" />
+                  </div>
+                  <p className="text-slate-800 font-black text-xs uppercase tracking-wider mb-1">
+                    Haz clic para subir imagen
+                  </p>
+                  <p className="text-indigo-600 font-extrabold text-[11px] bg-indigo-100/70 px-3 py-1 rounded-full mb-2">
+                    o pega aquí con Ctrl + V
+                  </p>
+                  <p className="text-slate-400 text-[10px]">Acepta PNG (transparente), JPG, CMYK y RGB</p>
+                </div>
+              )}
+              <input
+                type="file"
+                ref={fileInputCubrimiento}
+                className="hidden"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (file) procesarImagenCubrimiento(file);
+                }}
+              />
+            </div>
+
+            <div className="mt-4 text-center">
+              <button
+                type="button"
+                onClick={() => setShowCubrimientoModal(false)}
+                className="text-xs font-bold text-slate-400 hover:text-slate-600"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

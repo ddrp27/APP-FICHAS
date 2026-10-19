@@ -12,6 +12,8 @@ import traceback
 from openpyxl.drawing.image import Image
 from PIL import Image as PILImage
 import io
+import math
+import numpy as np
 import queue
 import threading
 import gc
@@ -143,6 +145,102 @@ class TelaContinuo(BaseModel):
 class ContinuoRequest(BaseModel):
     datos_globales: ContinuoGlobal
     telas_seleccionadas: List[TelaContinuo]
+
+class CubrimientoRequest(BaseModel):
+    imagen_base64: str
+
+ALPHA_UMBRAL = 10
+DELTA_E_UMBRAL = 23.0
+BORDE_FRACCION = 0.05
+
+def redondear_5_superior(pct: float) -> int:
+    return int(math.ceil(pct / 5.0) * 5)
+
+def rgb_a_lab(rgb: np.ndarray) -> np.ndarray:
+    """Convierte array (..., 3) en RGB [0,255] a CIELAB (D65)."""
+    arr = rgb.astype(np.float64) / 255.0
+    mascara = arr > 0.04045
+    arr = np.where(mascara, ((arr + 0.055) / 1.055) ** 2.4, arr / 12.92)
+    matriz = np.array([
+        [0.4124564, 0.3575761, 0.1804375],
+        [0.2126729, 0.7151522, 0.0721750],
+        [0.0193339, 0.1191920, 0.9503041],
+    ])
+    xyz = arr @ matriz.T
+    xyz /= np.array([0.95047, 1.0, 1.08883])
+    delta = 6.0 / 29.0
+    mascara = xyz > delta ** 3
+    f = np.where(mascara, np.cbrt(xyz), xyz / (3 * delta ** 2) + 4.0 / 29.0)
+    L = 116.0 * f[..., 1] - 16.0
+    a = 500.0 * (f[..., 0] - f[..., 1])
+    b = 200.0 * (f[..., 1] - f[..., 2])
+    return np.stack([L, a, b], axis=-1)
+
+def marco_bordes(arr: np.ndarray) -> np.ndarray:
+    h, w = arr.shape[:2]
+    grosor = max(2, int(min(h, w) * BORDE_FRACCION))
+    partes = [
+        arr[:grosor, :].reshape(-1, arr.shape[2]),
+        arr[-grosor:, :].reshape(-1, arr.shape[2]),
+        arr[:, :grosor].reshape(-1, arr.shape[2]),
+        arr[:, -grosor:].reshape(-1, arr.shape[2]),
+    ]
+    return np.concatenate(partes, axis=0)
+
+def moda_color(pixeles: np.ndarray) -> np.ndarray:
+    valores, conteos = np.unique(pixeles, axis=0, return_counts=True)
+    return valores[np.argmax(conteos)]
+
+def calcular_cubrimiento_core(im: PILImage.Image) -> dict:
+    max_dim = 1200
+    w, h = im.size
+    if max(w, h) > max_dim:
+        scale = max_dim / max(w, h)
+        new_w, new_h = max(1, int(w * scale)), max(1, int(h * scale))
+        im = im.resize((new_w, new_h), PILImage.Resampling.LANCZOS)
+
+    # 1. Detección por canal alfa si existe transparencia
+    if im.mode in ("RGBA", "LA", "PA"):
+        rgba = im.convert("RGBA")
+        alfa = np.array(rgba)[:, :, 3]
+        total = alfa.size
+        transparentes = int(np.sum(alfa < ALPHA_UMBRAL))
+        if transparentes > (total * 0.005):
+            tinta = int(np.sum(alfa >= ALPHA_UMBRAL))
+            pct = (tinta / total) * 100.0
+            pct_rep = redondear_5_superior(pct)
+            return {
+                "porcentaje_reportado": pct_rep,
+                "porcentaje_texto": f"{pct_rep}%",
+                "porcentaje_real": round(pct, 2),
+                "tiene_transparencia": True,
+                "color_fondo_hex": None,
+                "modo_origen": im.mode
+            }
+
+    # 2. Fondo sólido (RGB, CMYK, etc.)
+    rgb = np.array(im.convert("RGB"))
+    fondo_rgb = moda_color(marco_bordes(rgb))
+    lab = rgb_a_lab(rgb)
+    lab_fondo = rgb_a_lab(fondo_rgb.reshape(1, 1, 3)).ravel()
+    delta_e = np.sqrt(((lab - lab_fondo) ** 2).sum(axis=-1))
+    
+    es_fondo = delta_e < DELTA_E_UMBRAL
+    total = es_fondo.size
+    tinta = int((~es_fondo).sum())
+    pct = (tinta / total) * 100.0
+    pct_rep = redondear_5_superior(pct)
+    fondo_hex = "#{:02x}{:02x}{:02x}".format(int(fondo_rgb[0]), int(fondo_rgb[1]), int(fondo_rgb[2])).upper()
+
+    return {
+        "porcentaje_reportado": pct_rep,
+        "porcentaje_texto": f"{pct_rep}%",
+        "porcentaje_real": round(pct, 2),
+        "tiene_transparencia": False,
+        "color_fondo_hex": fondo_hex,
+        "modo_origen": im.mode
+    }
+
 
 TEMPLATE_LOCALIZADO = os.path.join(TEMPLATES_DIR, "Ficha_Desrollo_Estampacion_V01.xlsm")
 TEMPLATE_CONTINUA = os.path.join(TEMPLATES_DIR, "Ficha_Continua_V01.xlsm")
@@ -617,6 +715,19 @@ def download_task_file(task_id: str):
     return FileResponse(path=out_path, filename=filename, media_type=media_type)
 
 
+@app.post("/api/calcular-cubrimiento")
+def calcular_cubrimiento(req: CubrimientoRequest):
+    try:
+        raw_b64 = req.imagen_base64
+        if "," in raw_b64:
+            raw_b64 = raw_b64.split(",")[1]
+        img_bytes = base64.b64decode(raw_b64)
+        with PILImage.open(io.BytesIO(img_bytes)) as im:
+            result = calcular_cubrimiento_core(im)
+            return result
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error calculando cubrimiento: {str(e)}")
 
 
 DIST_PATH = os.path.join(os.path.abspath("."), "frontend_dist")

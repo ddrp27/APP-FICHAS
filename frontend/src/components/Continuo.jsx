@@ -26,6 +26,17 @@ export default function Continuo({ opciones, onBack, onQueueTask, isLocal }) {
   const [telasSeleccionadas, setTelasSeleccionadas] = useState([]);
   const [showTelaSearch, setShowTelaSearch] = useState(false);
 
+  const handleNuevaCarga = () => {
+    setGlobalData(prev => ({
+      ...prev,
+      referencia: '',
+      imagen_pattern_base64: ''
+    }));
+    setTelasSeleccionadas(prev => prev.map(t => ({ ...t, pantones: [] })));
+    setMessage(null);
+    setStep(1);
+  };
+
   const handleGlobalChange = (e) => {
     const { name, value } = e.target;
     setGlobalData(prev => ({ ...prev, [name]: value }));
@@ -219,7 +230,18 @@ export default function Continuo({ opciones, onBack, onQueueTask, isLocal }) {
         {step === 2 && (
           <div className="space-y-10 flex-1">
             <div className="flex items-center justify-between">
-              <h2 className="font-outfit text-4xl font-black text-slate-900 tracking-tighter">Selección de Telas</h2>
+              <div className="flex items-center gap-4">
+                <h2 className="font-outfit text-4xl font-black text-slate-900 tracking-tighter">Selección de Telas</h2>
+                {telasSeleccionadas.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setTelasSeleccionadas([])}
+                    className="text-xs font-bold text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-xl transition-colors"
+                  >
+                    Limpiar telas
+                  </button>
+                )}
+              </div>
               <div className="relative">
                 <button onClick={() => setShowTelaSearch(!showTelaSearch)} className="w-12 h-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-lg"><Plus /></button>
                 {showTelaSearch && (
@@ -329,7 +351,7 @@ export default function Continuo({ opciones, onBack, onQueueTask, isLocal }) {
             <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mb-6"><CheckCircle className="w-10 h-10" /></div>
             <h2 className="text-4xl font-black text-slate-900 mb-2">¡Fichas Generadas!</h2>
             <p className="text-slate-400 mb-10">{message?.text}</p>
-            <button onClick={() => window.location.reload()} className="btn-creative btn-next px-10">Nueva Carga</button>
+            <button onClick={handleNuevaCarga} className="btn-creative btn-next px-10">Nueva Ficha</button>
           </div>
         )}
 
