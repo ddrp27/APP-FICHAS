@@ -242,8 +242,14 @@ def calcular_cubrimiento_core(im: PILImage.Image) -> dict:
     }
 
 
-TEMPLATE_LOCALIZADO = os.path.join(TEMPLATES_DIR, "Ficha_Desrollo_Estampacion_V01.xlsm")
-TEMPLATE_CONTINUA = os.path.join(TEMPLATES_DIR, "Ficha_Continua_V01.xlsm")
+def resolve_template(primary, fallback):
+    p = os.path.join(TEMPLATES_DIR, primary)
+    if os.path.exists(p):
+        return p
+    return os.path.join(TEMPLATES_DIR, fallback)
+
+TEMPLATE_LOCALIZADO = resolve_template("FORMATO FICHA LOCALIZADO 2026.xlsm", "Ficha_Desrollo_Estampacion_V01.xlsm")
+TEMPLATE_CONTINUA = resolve_template("FORMATO FICHA CONTINUA 2026.xlsm", "Ficha_Continua_V01.xlsm")
 
 CACHED_OPCIONES = None
 
