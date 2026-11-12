@@ -736,6 +736,441 @@ def calcular_cubrimiento(req: CubrimientoRequest):
         raise HTTPException(status_code=500, detail=f"Error calculando cubrimiento: {str(e)}")
 
 
+# ============================================================================
+# LECTURA OPCIONAL DE TECH PACK (.AI / .PDF / .SVG / .JPG / .PNG)
+# ============================================================================
+import unicodedata
+import re
+import subprocess
+import tempfile
+import xml.etree.ElementTree as ET
+
+
+def _normalizar_texto(texto: str) -> str:
+    if not texto:
+        return ""
+    s = unicodedata.normalize("NFD", str(texto))
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    return re.sub(r"\s+", " ", s).strip().upper()
+
+
+def match_tela_inteligente(query_raw: str, lista_telas: list) -> tuple[str, list]:
+    """
+    Recibe un texto corto desde Illustrator (ej. 'OSAKA NEGRO', 'CATALINA NUDE', 'DIANA BLANCO')
+    y encuentra la tela correspondiente en la base de datos del Excel
+    (ej. 'TELA PTO OSAKA NEGRO 19-4005'), devolviendo (mejor_coincidencia, top_sugerencias).
+    """
+    if not query_raw or not lista_telas:
+        return (query_raw or "", [])
+
+    q_norm = _normalizar_texto(query_raw)
+    # Si ya coincide exactamente con alguna opción del Excel
+    for t in lista_telas:
+        if _normalizar_texto(t) == q_norm:
+            return (t, [t])
+
+    stopwords = {"TELA", "PTO", "DE", "LA", "EL", "CON", "PARA", "EN", "BASE"}
+    tokens = [tok for tok in re.split(r"[\s/\-,]+", q_norm) if len(tok) >= 2 and tok not in stopwords]
+    if not tokens:
+        return (query_raw.strip(), [])
+
+    scored = []
+    for tela in lista_telas:
+        t_norm = _normalizar_texto(tela)
+        t_words = [w for w in re.split(r"[\s/\-,]+", t_norm) if w]
+        score = 0
+        matched_tokens = 0
+        for tok in tokens:
+            token_hit = False
+            for tw in t_words:
+                if tok == tw:
+                    score += 12
+                    token_hit = True
+                    break
+                elif len(tok) >= 3 and len(tw) >= 3 and (tw.startswith(tok[:4]) or tok.startswith(tw[:4])):
+                    score += 8
+                    token_hit = True
+                    break
+                elif len(tok) >= 3 and tok in tw:
+                    score += 5
+                    token_hit = True
+                    break
+            if token_hit:
+                matched_tokens += 1
+
+        if matched_tokens > 0:
+            # Bonus si coincide el primer token (nombre base de la tela, ej. OSAKA, CATALINA, DIANA)
+            first_tok = tokens[0]
+            if any(first_tok == tw or (len(first_tok) >= 4 and tw.startswith(first_tok[:4])) for tw in t_words):
+                score += 25
+            # Bonus si coinciden todos los tokens buscados (ej. TELA + COLOR)
+            if matched_tokens == len(tokens):
+                score += 30
+            scored.append((score, tela))
+
+    scored.sort(key=lambda x: (-x[0], x[1]))
+    if not scored:
+        return (query_raw.strip(), [])
+
+    top_telas = [t for _, t in scored[:6]]
+    return (top_telas[0], top_telas)
+
+
+def match_opcion_excel(raw_val: str, opciones_lista: list, campo: str = "") -> str:
+    """
+    Empata valores cortos escritos en Illustrator (ej. 'ESTAMPACIÓN', '1', 'GEL', 'SHIMMER')
+    con las opciones válidas de la hoja DATOS del Excel.
+    """
+    if not raw_val:
+        return ""
+    val_norm = _normalizar_texto(raw_val)
+    if not opciones_lista:
+        return raw_val.strip()
+
+    # 1. Coincidencia directa normalizada
+    for opt in opciones_lista:
+        if _normalizar_texto(opt) == val_norm:
+            return opt
+
+    # 2. Reglas de alias frecuentes según el campo
+    if campo == "proceso":
+        for opt in opciones_lista:
+            o_norm = _normalizar_texto(opt)
+            if "ESTAMP" in val_norm and "ESTAMP" in o_norm:
+                return opt
+            if "SUBLIM" in val_norm and "SUBLIM" in o_norm:
+                return opt
+
+    if campo == "num_estampados":
+        if val_norm.isdigit():
+            buscado = f"{val_norm} DE {val_norm}"
+            for opt in opciones_lista:
+                if _normalizar_texto(opt) == buscado:
+                    return opt
+            for opt in opciones_lista:
+                if _normalizar_texto(opt).startswith(f"{val_norm} DE"):
+                    return opt
+
+    if campo == "material":
+        alias_map = {
+            "GEL": "EFEC.GEL",
+            "EFECTO GEL": "EFEC.GEL",
+            "SHIMMER": "SHIMER",
+            "GALAXY": "GALAXI",
+            "MIRELLA": "MIRELLA ENCASULADA",
+            "VINILO": "VINILO LIV",
+            "PUFF": "PUF",
+            "ALTA DENSIDAD": "PLASTISOL",
+            "BASE AGUA": "TEXTIL",
+        }
+        for k, target in alias_map.items():
+            if k in val_norm:
+                for opt in opciones_lista:
+                    if target in _normalizar_texto(opt):
+                        return opt
+
+    # 3. Coincidencia parcial por prefijo o inclusión
+    for opt in opciones_lista:
+        o_norm = _normalizar_texto(opt)
+        if val_norm in o_norm or o_norm in val_norm:
+            return opt
+
+    return raw_val.strip()
+
+
+def _pil_to_data_url(im: PILImage.Image, max_dim: int = 1200) -> str:
+    w, h = im.size
+    if max(w, h) > max_dim:
+        scale = max_dim / max(w, h)
+        im = im.resize((max(1, int(w * scale)), max(1, int(h * scale))), PILImage.Resampling.LANCZOS)
+    buf = io.BytesIO()
+    im.save(buf, format="PNG", optimize=True)
+    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{b64}"
+
+
+def _recortar_zonas_techpack(page_img: PILImage.Image) -> dict:
+    """
+    Dada la imagen completa de la hoja Carta (proporción 612 x 792 pt),
+    recorta automáticamente:
+      - ZONA_ROPERO_CAD (x=32..320, y=136..342)
+      - ZONA_PANTALLAZO_MOLDE (x=32..320, y=396..656)
+      - ZONA_ARTE_AISLADO (x=378..534, y=156..324) -> calcula % cubrimiento
+    """
+    W_ref, H_ref = 612.0, 792.0
+    w, h = page_img.size
+
+    def crop_box(x1, y1, x2, y2):
+        return page_img.crop((
+            int(round(x1 / W_ref * w)),
+            int(round(y1 / H_ref * h)),
+            int(round(x2 / W_ref * w)),
+            int(round(y2 / H_ref * h)),
+        ))
+
+    crop_ropero = crop_box(32, 136, 320, 342)
+    crop_molde  = crop_box(32, 396, 320, 656)
+    crop_arte   = crop_box(378, 156, 534, 324)
+
+    cub_info = None
+    try:
+        cub_info = calcular_cubrimiento_core(crop_arte)
+    except Exception as e:
+        print(f"Warning calculando cubrimiento desde ZONA_ARTE_AISLADO: {e}")
+
+    return {
+        "img_ropero_cad": _pil_to_data_url(crop_ropero),
+        "img_pantallazo_molde": _pil_to_data_url(crop_molde),
+        "cubrimiento_arte_info": cub_info
+    }
+
+
+def _extraer_campos_desde_words(words: list) -> dict:
+    def text_in_box(xmin, ymin, xmax, ymax, exclude_prefixes=()):
+        in_box = [
+            w for w in words
+            if xmin <= w["cx"] <= xmax and ymin <= w["cy"] <= ymax
+        ]
+        # Ordenar por línea (y1 redondeado a 4 pt) y luego por x1
+        in_box.sort(key=lambda w: (round(w["y1"] / 4.0), w["x1"]))
+        joined = " ".join(w["text"] for w in in_box).strip()
+        for pref in exclude_prefixes:
+            pattern = r"^" + re.escape(pref) + r"\s*:?\s*"
+            joined = re.sub(pattern, "", joined, flags=re.IGNORECASE).strip()
+        return joined
+
+    campos = {
+        "referencia":       text_in_box(226, 20, 360, 44, ("REFERENCIA:", "REFERENCIA")),
+        "proceso":          text_in_box(360, 20, 488, 44, ("PROCESO:", "PROCESO")),
+        "pieza":            text_in_box(488, 20, 595, 44, ("PIEZA:", "PIEZA")),
+        "tela_base":        text_in_box(226, 44, 360, 66, ("TELA BASE:", "TELA BASE")),
+        "tipo_logo":        text_in_box(360, 44, 488, 66, ("TIPO LOGO:", "TIPO LOGO")),
+        "num_piezas":       text_in_box(488, 44, 595, 66, ("# PIEZAS:", "# PIEZAS", "PIEZAS:")),
+        "num_estampados":   text_in_box(226, 66, 360, 92, ("# ESTAMPADOS:", "# ESTAMPADOS", "ESTAMPADOS:")),
+        "foil":             text_in_box(360, 66, 488, 92, ("FOIL:", "FOIL")),
+        "alta_densi":       text_in_box(488, 66, 595, 92, ("ALTA DENSI.:", "ALTA DENSI:", "ALTA DENSIDAD:")),
+        "ancho_cm":         text_in_box(360, 400, 429.3, 434, ("ANCHO (CM):", "ANCHO (CM)", "ANCHO:")),
+        "alto_cm":          text_in_box(429.3, 400, 498.6, 434, ("% ALTO (CM):", "ALTO (CM):", "ALTO (CM)", "ALTO:")),
+        "porc_cubrimiento": text_in_box(498.6, 400, 568, 434, ("% CUBRIMIENTO:", "CUBRIMIENTO:")),
+    }
+
+    # Observaciones (Bloque 4: x=340..588, y=496..664) agrupadas por renglón
+    obs_words = [w for w in words if 340 <= w["cx"] <= 588 and 496 <= w["cy"] <= 664]
+    obs_words.sort(key=lambda w: (round(w["y1"] / 5.0), w["x1"]))
+    lines = []
+    cur_line = []
+    last_y = None
+    for w in obs_words:
+        if last_y is None or abs(w["y1"] - last_y) <= 5.5:
+            cur_line.append(w["text"])
+            if last_y is None:
+                last_y = w["y1"]
+        else:
+            lines.append(" ".join(cur_line))
+            cur_line = [w["text"]]
+            last_y = w["y1"]
+    if cur_line:
+        lines.append(" ".join(cur_line))
+    campos["observaciones"] = "\n".join(lines).strip()
+
+    # 5 Tarjetas de Color en el Bloque 5 (y=705..775)
+    colores_extraidos = []
+    for i in range(5):
+        cx_min = 34 + i * 110
+        cx_max = cx_min + 108
+        mat = text_in_box(cx_min + 36, 718, cx_max, 736, ("MATERIAL:", "MAT:"))
+        pms = text_in_box(cx_min + 36, 736, cx_max, 751, ("PANTONE:", "PMS:"))
+        nom = text_in_box(cx_min + 36, 750, cx_max, 768, ("COLOR:", "COL:"))
+        if any(x and x not in ("-", "(VACÍO)", "VACIO") for x in (mat, pms, nom)):
+            colores_extraidos.append({
+                "material": mat,
+                "pantone": pms,
+                "color": nom
+            })
+    campos["colores"] = colores_extraidos
+    return campos
+
+
+def _extraer_textos_pdftotext(filepath: str) -> dict:
+    """
+    Usa pdftotext -bbox-layout para extraer cada palabra con sus coordenadas
+    en la hoja Carta (612 x 792 pt) desde archivos .ai (PDF compatible) o .pdf.
+    """
+    pdftotext_candidates = ["/usr/local/bin/pdftotext", "/opt/homebrew/bin/pdftotext", "pdftotext"]
+    cmd_bin = None
+    for c in pdftotext_candidates:
+        if os.path.exists(c) or shutil.which(c):
+            cmd_bin = c
+            break
+    if not cmd_bin:
+        return {}
+
+    res = subprocess.run([cmd_bin, "-bbox-layout", filepath, "-"], capture_output=True, text=True, timeout=15)
+    if res.returncode != 0 or not res.stdout:
+        return {}
+
+    xml_str = res.stdout
+    page_m = re.search(r'<page\s+width="([\d\.]+)"\s+height="([\d\.]+)"', xml_str)
+    pw = float(page_m.group(1)) if page_m else 612.0
+    ph = float(page_m.group(2)) if page_m else 792.0
+
+    words = []
+    for m in re.finditer(r'<word\s+xMin="([\d\.]+)"\s+yMin="([\d\.]+)"\s+xMax="([\d\.]+)"\s+yMax="([\d\.]+)">(.*?)</word>', xml_str):
+        x1 = float(m.group(1)) * 612.0 / pw
+        y1 = float(m.group(2)) * 792.0 / ph
+        x2 = float(m.group(3)) * 612.0 / pw
+        y2 = float(m.group(4)) * 792.0 / ph
+        txt = m.group(5).replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").strip()
+        if txt:
+            words.append({"x1": x1, "y1": y1, "x2": x2, "y2": y2, "cx": (x1 + x2) / 2.0, "cy": (y1 + y2) / 2.0, "text": txt})
+
+    return _extraer_campos_desde_words(words)
+
+
+def _extraer_textos_vision_ocr(filepath: str) -> dict:
+    """
+    Usa el binario nativo vision_ocr (macOS Vision Framework) para extraer textos
+    y coordenadas desde una imagen .jpg / .png del Tech Pack.
+    """
+    import json
+    ocr_bin = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vision_ocr")
+    if not os.path.exists(ocr_bin):
+        return {}
+    try:
+        res = subprocess.run([ocr_bin, filepath], capture_output=True, text=True, timeout=15)
+        if res.returncode == 0 and res.stdout:
+            words = json.loads(res.stdout)
+            if isinstance(words, list) and words:
+                return _extraer_campos_desde_words(words)
+    except Exception as e:
+        print(f"Warning en OCR Vision para imagen: {e}")
+    return {}
+
+
+@app.post("/api/leer-techpack")
+async def leer_techpack(file: UploadFile = File(...)):
+    """
+    Endpoint opcional para leer una ficha técnica en formato .ai, .pdf, .svg, .jpg o .png
+    y devolver los campos técnicos autocompletados y empatados con el Excel.
+    """
+    filename = (file.filename or "").lower()
+    raw_bytes = await file.read()
+    if not raw_bytes:
+        raise HTTPException(status_code=400, detail="El archivo subido está vacío.")
+
+    opciones = get_opciones()
+    tmp_dir = tempfile.mkdtemp(prefix="techpack_")
+    ext = os.path.splitext(filename)[1] or ".pdf"
+    tmp_path = os.path.join(tmp_dir, f"upload{ext}")
+
+    try:
+        with open(tmp_path, "wb") as f:
+            f.write(raw_bytes)
+
+        campos_raw = {}
+        visuales = {}
+
+        # Caso 1: Archivo .ai o .pdf (Illustrator guarda encabezado %PDF)
+        is_pdf_header = raw_bytes[:1024].find(b"%PDF-") != -1
+        if ext in (".ai", ".pdf") or is_pdf_header:
+            campos_raw = _extraer_textos_pdftotext(tmp_path)
+            # Renderizar página 1 para recortar Ropero CAD, Molde y Arte Aislado
+            try:
+                from pdf2image import convert_from_path
+                # Asegurar que poppler en /usr/local/bin o /opt/homebrew/bin esté disponible
+                poppler_dir = "/usr/local/bin" if os.path.exists("/usr/local/bin/pdftoppm") else (
+                    "/opt/homebrew/bin" if os.path.exists("/opt/homebrew/bin/pdftoppm") else None
+                )
+                pages = convert_from_path(tmp_path, dpi=180, first_page=1, last_page=1, poppler_path=poppler_dir)
+                if pages:
+                    visuales = _recortar_zonas_techpack(pages[0])
+            except Exception as e_img:
+                print(f"Warning renderizando imagen desde PDF/AI: {e_img}")
+
+        # Caso 2: Archivo .svg
+        elif ext == ".svg":
+            root = ET.fromstring(raw_bytes.decode("utf-8", errors="ignore"))
+            id_map = {el.attrib.get("id"): "".join(el.itertext()).strip() for el in root.iter() if el.attrib.get("id")}
+            campos_raw = {
+                "referencia":       id_map.get("CAMPO_REFERENCIA", ""),
+                "proceso":          id_map.get("CAMPO_PROCESO", ""),
+                "pieza":            id_map.get("CAMPO_PIEZA", ""),
+                "tela_base":        id_map.get("CAMPO_TELA_BASE", ""),
+                "tipo_logo":        id_map.get("CAMPO_TIPO_LOGO", ""),
+                "num_piezas":       id_map.get("CAMPO_NUM_PIEZAS", ""),
+                "num_estampados":   id_map.get("CAMPO_NUM_ESTAMPADOS", ""),
+                "foil":             id_map.get("CAMPO_FOIL", ""),
+                "alta_densi":       id_map.get("CAMPO_ALTA_DENSI", ""),
+                "ancho_cm":         id_map.get("CAMPO_ANCHO_CM", ""),
+                "alto_cm":          id_map.get("CAMPO_ALTO_CM", ""),
+                "porc_cubrimiento": id_map.get("CAMPO_PORC_CUBRIMIENTO", ""),
+                "observaciones":    id_map.get("CAMPO_OBSERVACIONES", ""),
+                "colores": []
+            }
+            for i in range(1, 6):
+                mat = id_map.get(f"COLOR_{i}_MAT", "")
+                pms = id_map.get(f"COLOR_{i}_PMS", "")
+                nom = id_map.get(f"COLOR_{i}_NOM", "")
+                if any([mat, pms, nom]):
+                    campos_raw["colores"].append({"material": mat, "pantone": pms, "color": nom})
+
+        # Caso 3: Imagen raster (.jpg, .jpeg, .png)
+        else:
+            campos_raw = _extraer_textos_vision_ocr(tmp_path)
+            with PILImage.open(io.BytesIO(raw_bytes)) as im_page:
+                visuales = _recortar_zonas_techpack(im_page)
+
+        # Empatar campos con las listas del Excel (búsqueda inteligente)
+        tela_raw = campos_raw.get("tela_base", "")
+        mejor_tela, sugerencias_tela = match_tela_inteligente(tela_raw, opciones.get("tela_base", []))
+
+        colores_final = []
+        for c in campos_raw.get("colores", []):
+            colores_final.append({
+                "material": match_opcion_excel(c.get("material", ""), opciones.get("material", []), "material"),
+                "pantone": c.get("pantone", ""),
+                "color": c.get("color", "")
+            })
+
+        porc_cub = campos_raw.get("porc_cubrimiento", "")
+        cub_info = visuales.get("cubrimiento_arte_info")
+        if not porc_cub and cub_info and cub_info.get("porcentaje_texto"):
+            porc_cub = cub_info["porcentaje_texto"]
+
+        resultado = {
+            "campos": {
+                "referencia":       campos_raw.get("referencia", ""),
+                "proceso":          match_opcion_excel(campos_raw.get("proceso", ""), opciones.get("proceso", []), "proceso"),
+                "pieza":            match_opcion_excel(campos_raw.get("pieza", ""), opciones.get("pieza", []), "pieza"),
+                "tela_base":        mejor_tela,
+                "tela_original":    tela_raw,
+                "sugerencias_tela": sugerencias_tela,
+                "tipo_logo":        match_opcion_excel(campos_raw.get("tipo_logo", ""), opciones.get("tipo_logo", []), "tipo_logo"),
+                "num_piezas":       campos_raw.get("num_piezas", ""),
+                "num_estampados":   match_opcion_excel(campos_raw.get("num_estampados", ""), opciones.get("num_estampado", []), "num_estampados"),
+                "foil":             match_opcion_excel(campos_raw.get("foil", ""), opciones.get("foil", []), "foil"),
+                "alta_densi":       campos_raw.get("alta_densi", ""),
+                "ancho_cm":         campos_raw.get("ancho_cm", ""),
+                "alto_cm":          campos_raw.get("alto_cm", ""),
+                "porc_cubrimiento": porc_cub,
+                "observaciones":    campos_raw.get("observaciones", ""),
+            },
+            "colores": colores_final,
+            "images": {
+                "img_ropero_cad": visuales.get("img_ropero_cad"),
+                "img_pantallazo_molde": visuales.get("img_pantallazo_molde")
+            },
+            "cubrimiento_info": cub_info
+        }
+        return resultado
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"No se pudo procesar el Tech Pack: {str(e)}")
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+
 DIST_PATH = os.path.join(os.path.abspath("."), "frontend_dist")
 if not os.path.exists(DIST_PATH):
     DIST_PATH = get_resource_path("dist")

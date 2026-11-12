@@ -24,6 +24,12 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
   const [cubrimientoInfo, setCubrimientoInfo] = useState(null);
   const fileInputCubrimiento = useRef(null);
 
+  // Optional Tech Pack (.ai / .pdf / .jpg) auto-fill state
+  const [leyendoTechPack, setLeyendoTechPack] = useState(false);
+  const [techPackNotice, setTechPackNotice] = useState(null);
+  const [sugerenciasTela, setSugerenciasTela] = useState([]);
+  const fileInputTechPack = useRef(null);
+
   const fileInputRopero = useRef(null);
   const fileInputMolde = useRef(null);
   const [formData, setFormData] = useState({
@@ -95,6 +101,73 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
     reader.readAsDataURL(fileOrBlob);
   };
 
+  const handleTechPackUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    setLeyendoTechPack(true);
+    setMessage(null);
+    setTechPackNotice(null);
+
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await axios.post(`${API_BASE}/leer-techpack`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      const { campos, colores: coloresExtraidos, images: imgsExtraidas, cubrimiento_info } = res.data || {};
+
+      if (campos) {
+        setFormData(prev => {
+          const next = { ...prev };
+          [
+            'referencia', 'proceso', 'pieza', 'tela_base', 'tipo_logo',
+            'num_piezas', 'num_estampados', 'foil', 'alta_densi',
+            'ancho_cm', 'alto_cm', 'porc_cubrimiento', 'observaciones'
+          ].forEach(k => {
+            if (campos[k] !== undefined && campos[k] !== '') {
+              next[k] = campos[k];
+            }
+          });
+          return next;
+        });
+
+        if (Array.isArray(campos.sugerencias_tela) && campos.sugerencias_tela.length > 0) {
+          setSugerenciasTela(campos.sugerencias_tela);
+        }
+      }
+
+      if (Array.isArray(coloresExtraidos) && coloresExtraidos.length > 0) {
+        setColores(coloresExtraidos);
+      }
+
+      if (imgsExtraidas) {
+        setImages(prev => ({
+          img_ropero_cad: imgsExtraidas.img_ropero_cad || prev.img_ropero_cad,
+          img_pantallazo_molde: imgsExtraidas.img_pantallazo_molde || prev.img_pantallazo_molde
+        }));
+      }
+
+      if (cubrimiento_info) {
+        setCubrimientoInfo(cubrimiento_info);
+      }
+
+      setTechPackNotice(
+        `Tech Pack "${file.name}" cargado automáticamente. Todos los campos siguen siendo editables manualmente.`
+      );
+    } catch (err) {
+      console.error("Error leyendo Tech Pack:", err);
+      setMessage({
+        type: 'error',
+        text: err.response?.data?.detail || 'No se pudo leer el archivo Tech Pack. Puedes llenar los campos manualmente.'
+      });
+    } finally {
+      setLeyendoTechPack(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!images.img_ropero_cad || !images.img_pantallazo_molde) {
       setMessage({ type: 'error', text: 'Sube ambas imágenes para continuar.' });
@@ -160,8 +233,30 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
           </div>
         </div>
 
-        {/* Stepper Pills */}
+        {/* Stepper Pills + Optional Tech Pack Upload Button */}
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => fileInputTechPack.current?.click()}
+            disabled={leyendoTechPack}
+            className="btn-editorial-secondary border-[#c7d2fe] bg-[#eef2ff]/80 text-[#4338ca] hover:bg-[#e0e7ff]"
+            title="Opcional: Sube tu Tech Pack en .ai, .pdf o .jpg para autocompletar los campos técnicos"
+          >
+            {leyendoTechPack ? (
+              <Loader2 className="w-3.5 h-3.5 text-[#4f46e5] animate-spin" />
+            ) : (
+              <Upload className="w-3.5 h-3.5 text-[#4f46e5]" />
+            )}
+            <span>{leyendoTechPack ? 'Leyendo Tech Pack...' : 'Cargar Tech Pack (.ai / .pdf / .jpg)'}</span>
+          </button>
+          <input
+            type="file"
+            ref={fileInputTechPack}
+            className="hidden"
+            accept=".ai,.pdf,.svg,.jpg,.jpeg,.png"
+            onChange={handleTechPackUpload}
+          />
+
           {steps.map((s) => (
             <button
               key={s.id}
@@ -187,6 +282,22 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
             <div className="w-14 h-14 border-2 border-[#e2e8f0] border-t-[#4f46e5] rounded-full animate-spin mb-4" />
             <span className="eyebrow-editorial mb-1">PROCESANDO FICHA</span>
             <h3 className="text-lg font-extrabold text-[#0f172a] tracking-[-0.3px]">{statusMsg}</h3>
+          </div>
+        )}
+
+        {techPackNotice && step !== 5 && (
+          <div className="mb-6 p-3.5 rounded-xl bg-[#ecfdf5] border border-[#a7f3d0] text-[#065f46] flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <CheckCircle className="w-4 h-4 text-[#059669] shrink-0" />
+              <p className="font-bold text-xs m-0">{techPackNotice}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setTechPackNotice(null)}
+              className="text-[#059669] hover:text-[#065f46] bg-transparent border-0 cursor-pointer p-1"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         )}
 
@@ -298,6 +409,27 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
                 <datalist id="telas">
                   {opciones.tela_base?.map(t => <option key={t} value={t} />)}
                 </datalist>
+                {sugerenciasTela.length > 1 && (
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    <span className="text-[10px] font-bold text-[#64748b] uppercase tracking-wider">
+                      Coincidencias Excel:
+                    </span>
+                    {sugerenciasTela.map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, tela_base: t }))}
+                        className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-colors cursor-pointer ${
+                          formData.tela_base === t
+                            ? 'bg-[#4f46e5] text-white border-[#4f46e5]'
+                            : 'bg-[#f8fafc] text-[#334155] border-[#e2e8f0] hover:border-[#4f46e5]'
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>
