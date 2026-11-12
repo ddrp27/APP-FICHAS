@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="8.5in" height="11in" viewBox="0 0 612 792">
+  <defs>
+    <pattern id="grid" width="18" height="18" patternUnits="userSpaceOnUse">
+      <path d="M 18 0 L 0 0 0 18" fill="none" stroke="#EBEBEB" stroke-width="0.6"/>
+    </pattern>
+    <style>
+      .f-title { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 800; font-size: 13px; fill: #FFFFFF; }
+      .f-badge { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 800; font-size: 9.8px; fill: #FFFFFF; }
+      .f-lbl   { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 800; font-size: 7.2px; fill: #111111; }
+      .f-val   { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 500; font-size: 7.2px; fill: #111111; }
+      .f-sub   { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 800; font-size: 8.5px; fill: #111111; }
+      .f-cota  { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 800; font-size: 7.5px; fill: #D22626; }
+      .f-obs   { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 500; font-size: 8.2px; fill: #111111; }
+      .f-sw-l  { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 700; font-size: 5.5px; fill: #646464; }
+      .f-sw-v  { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 800; font-size: 6.2px; fill: #111111; }
+    </style>
+  </defs>
+
+  <!-- CAPA 1: CUADRÍCULA DE FONDO (HOJA CARTA 8.5 x 11 IN / 612 x 792 PT) -->
+  <g id="1_CUADRICULA_FONDO">
+    <rect x="0" y="0" width="612" height="792" fill="#FFFFFF"/>
+    <rect x="0" y="0" width="612" height="792" fill="url(#grid)"/>
+  </g>
+
+  <!-- CAPA 2: ESTRUCTURA Y BORDES -->
+  <g id="2_ESTRUCTURA_BORDES">
+    <!-- Tabla Cabezote 3x3 -->
+    <rect id="TABLA_CABEZOTE" x="226" y="22" width="362" height="66" fill="#FFFFFF" stroke="#111111" stroke-width="1.3"/>
+    <line x1="226" y1="44" x2="588" y2="44" stroke="#111111" stroke-width="1"/>
+    <line x1="226" y1="66" x2="588" y2="66" stroke="#111111" stroke-width="1"/>
+    <line x1="360" y1="22" x2="360" y2="88" stroke="#111111" stroke-width="1"/>
+    <line x1="488" y1="22" x2="488" y2="88" stroke="#111111" stroke-width="1"/>
+
+    <!-- Bloque 1: Ropero CAD 2D -->
+    <rect id="CAJA_1_ROPERO" x="24" y="102" width="304" height="248" rx="8" ry="8" fill="none" stroke="#111111" stroke-width="1.4"/>
+    <line x1="24" y1="120" x2="328" y2="120" stroke="#111111" stroke-width="1.1"/>
+
+    <!-- Bloque 2: Pantallazo Molde -->
+    <rect id="CAJA_2_MOLDE" x="24" y="362" width="304" height="302" rx="8" ry="8" fill="none" stroke="#111111" stroke-width="1.4"/>
+    <line x1="24" y1="380" x2="328" y2="380" stroke="#111111" stroke-width="1.1"/>
+
+    <!-- Bloque 3: Arte Aislado (100%) -->
+    <rect id="CAJA_3_ARTE_AISLADO" x="340" y="102" width="248" height="352" rx="8" ry="8" fill="none" stroke="#111111" stroke-width="1.4"/>
+    <line x1="340" y1="120" x2="588" y2="120" stroke="#111111" stroke-width="1.1"/>
+    <!-- Línea de llamada roja entre Ropero y Arte -->
+    <line x1="284" y1="250" x2="370" y2="240" stroke="#D22626" stroke-width="1"/>
+    <circle cx="284" cy="250" r="2.2" fill="#FFFFFF" stroke="#D22626" stroke-width="1"/>
+
+    <!-- Mini-tabla de Medidas y % Cubrimiento dentro del Bloque 3 -->
+    <rect id="TABLA_MEDIDAS_CUBRIMIENTO" x="360" y="382" width="208" height="42" fill="#FFFFFF" stroke="#111111" stroke-width="1.1"/>
+    <line x1="360" y1="402" x2="568" y2="402" stroke="#111111" stroke-width="1"/>
+    <line x1="429.3" y1="382" x2="429.3" y2="424" stroke="#111111" stroke-width="1"/>
+    <line x1="498.6" y1="382" x2="498.6" y2="424" stroke="#111111" stroke-width="1"/>
+
+    <!-- Bloque 4: Observaciones Técnicas -->
+    <rect id="CAJA_4_OBSERVACIONES" x="340" y="466" width="248" height="198" rx="8" ry="8" fill="none" stroke="#111111" stroke-width="1.4"/>
+    <line x1="340" y1="484" x2="588" y2="484" stroke="#111111" stroke-width="1.1"/>
+
+    <!-- Bloque 5: Armonía de Color / Pantones -->
+    <rect id="CAJA_5_COLORES" x="24" y="678" width="564" height="92" rx="8" ry="8" fill="none" stroke="#111111" stroke-width="1.4"/>
+    <line x1="24" y1="694" x2="588" y2="694" stroke="#111111" stroke-width="1.1"/>
+
+    <!-- 5 Tarjetas de Color -->
+    <rect id="TARJETA_COLOR_1" x="34"    y="710" width="104" height="52" fill="#FFFFFF" stroke="#111111" stroke-width="1"/>
+    <rect id="TARJETA_COLOR_2" x="144"   y="710" width="104" height="52" fill="#FFFFFF" stroke="#111111" stroke-width="1"/>
+    <rect id="TARJETA_COLOR_3" x="254"   y="710" width="104" height="52" fill="#FFFFFF" stroke="#111111" stroke-width="1"/>
+    <rect id="TARJETA_COLOR_4" x="364"   y="710" width="104" height="52" fill="#FFFFFF" stroke="#111111" stroke-width="1"/>
+    <rect id="TARJETA_COLOR_5" x="474"   y="710" width="104" height="52" fill="#FFFFFF" stroke="#111111" stroke-width="1"/>
+  </g>
+
+  <!-- CAPA 3: ETIQUETAS FIJAS -->
+  <g id="3_ETIQUETAS_FIJAS">
+    <!-- Título Principal -->
+    <rect x="24" y="38" width="190" height="26" rx="13" ry="13" fill="#111111"/>
+    <text x="39" y="55.5" class="f-title">FICHA TÉCNICA - ARTE</text>
+
+    <!-- Etiquetas Tabla Cabezote -->
+    <text x="231" y="36" class="f-lbl">REFERENCIA:</text>
+    <text x="365" y="36" class="f-lbl">PROCESO:</text>
+    <text x="493" y="36" class="f-lbl">PIEZA:</text>
+
+    <text x="231" y="58" class="f-lbl">TELA BASE:</text>
+    <text x="365" y="58" class="f-lbl">TIPO LOGO:</text>
+    <text x="493" y="58" class="f-lbl"># PIEZAS:</text>
+
+    <text x="231" y="80" class="f-lbl"># ESTAMPADOS:</text>
+    <text x="365" y="80" class="f-lbl">FOIL:</text>
+    <text x="493" y="80" class="f-lbl">ALTA DENSI.:</text>
+
+    <!-- Badges de Secciones -->
+    <rect x="34" y="108" width="150" height="22" rx="11" ry="11" fill="#111111"/>
+    <text x="46" y="122.5" class="f-badge">1. ROPERO CAD 2D</text>
+
+    <rect x="34" y="368" width="174" height="22" rx="11" ry="11" fill="#111111"/>
+    <text x="46" y="382.5" class="f-badge">2. PANTALLAZO MOLDE</text>
+
+    <rect x="350" y="108" width="184" height="22" rx="11" ry="11" fill="#111111"/>
+    <text x="362" y="122.5" class="f-badge">3. ARTE AISLADO (100%)</text>
+
+    <rect x="350" y="472" width="205" height="22" rx="11" ry="11" fill="#111111"/>
+    <text x="362" y="486.5" class="f-badge">4. OBSERVACIONES TÉCNICAS</text>
+
+    <rect x="34" y="682" width="240" height="22" rx="11" ry="11" fill="#111111"/>
+    <text x="46" y="696.5" class="f-badge">5. ARMONÍA DE COLOR / PANTONES</text>
+
+    <!-- Subtítulos Delantero / Posterior -->
+    <text x="82"  y="326" class="f-sub">DELANTERO</text>
+    <text x="218" y="326" class="f-sub">POSTERIOR</text>
+
+    <!-- Cotas de Arte Aislado -->
+    <line x1="542" y1="154" x2="550" y2="154" stroke="#D22626" stroke-width="1"/>
+    <line x1="542" y1="326" x2="550" y2="326" stroke="#D22626" stroke-width="1"/>
+    <line x1="546" y1="154" x2="546" y2="326" stroke="#D22626" stroke-width="1"/>
+    <text x="556" y="255" class="f-cota" transform="rotate(-90 556,255)">ALTO: 28 cm</text>
+
+    <line x1="376" y1="332" x2="376" y2="340" stroke="#D22626" stroke-width="1"/>
+    <line x1="536" y1="332" x2="536" y2="340" stroke="#D22626" stroke-width="1"/>
+    <line x1="376" y1="336" x2="536" y2="336" stroke="#D22626" stroke-width="1"/>
+    <text x="430" y="349" class="f-cota">ANCHO: 24 cm</text>
+
+    <!-- Etiquetas Mini-tabla Medidas -->
+    <text x="368" y="395" class="f-lbl">ANCHO (CM):</text>
+    <text x="441" y="395" class="f-lbl">ALTO (CM):</text>
+    <text x="502" y="395" class="f-lbl">% CUBRIMIENTO:</text>
+
+    <!-- Etiquetas Tarjetas de Color -->
+    <text x="84"  y="720" class="f-sw-l">MATERIAL:</text>
+    <text x="84"  y="737" class="f-sw-l">PANTONE:</text>
+    <text x="194" y="720" class="f-sw-l">MATERIAL:</text>
+    <text x="194" y="737" class="f-sw-l">PANTONE:</text>
+    <text x="304" y="720" class="f-sw-l">MATERIAL:</text>
+    <text x="304" y="737" class="f-sw-l">PANTONE:</text>
+    <text x="414" y="720" class="f-sw-l">MATERIAL:</text>
+    <text x="414" y="737" class="f-sw-l">PANTONE:</text>
+    <text x="524" y="720" class="f-sw-l">MATERIAL:</text>
+    <text x="524" y="737" class="f-sw-l">PANTONE:</text>
+  </g>
+
+  <!-- CAPA 4: ZONAS DE IMAGEN Y COLOR (RECORTADAS POR LA APP) -->
+  <g id="4_ZONAS_IMAGEN_Y_COLOR">
+    <!-- Marcos exactos de recorte para la App -->
+    <rect id="ZONA_ROPERO_CAD" x="32" y="136" width="288" height="206" fill="none" stroke="#EBEBEB" stroke-width="0.5"/>
+    <rect id="ZONA_PANTALLAZO_MOLDE" x="32" y="396" width="288" height="260" fill="none" stroke="#EBEBEB" stroke-width="0.5"/>
+    <rect id="ZONA_ARTE_AISLADO" x="376" y="154" width="160" height="172" fill="#FFFFFF" stroke="#111111" stroke-width="1.2"/>
+
+    <!-- Camiseta Delantero (Ejemplo en Ropero CAD) -->
+    <polygon points="86,192 134,192 169,227 154,240 144,228 144,298 76,298 76,228 66,240 51,227" fill="#111111" stroke="#111111" stroke-width="1"/>
+    <rect x="116" y="216" width="18" height="18" fill="none" stroke="#FFFFFF" stroke-width="0.8"/>
+
+    <!-- Camiseta Posterior (Ejemplo en Ropero CAD) -->
+    <polygon points="220,192 268,192 303,227 288,240 278,228 278,298 210,298 210,228 200,240 185,227" fill="#111111" stroke="#111111" stroke-width="1"/>
+    <rect x="226" y="212" width="36" height="38" fill="none" stroke="#FFFFFF" stroke-width="1"/>
+
+    <!-- Molde de Patronaje (Ejemplo en Pantallazo Molde) -->
+    <polygon id="SILUETA_MOLDE_EJEMPLO" points="96,428 138,418 150,448 190,448 202,418 244,428 232,494 254,512 250,642 90,642 86,512 108,494" fill="#FFFFFF" stroke="#111111" stroke-width="1.2"/>
+    <line x1="170" y1="450" x2="170" y2="638" stroke="#111111" stroke-width="0.7"/>
+    <line x1="190" y1="448" x2="262" y2="448" stroke="#D22626" stroke-width="0.8"/>
+    <line x1="190" y1="482" x2="262" y2="482" stroke="#D22626" stroke-width="0.8"/>
+    <line x1="256" y1="448" x2="256" y2="482" stroke="#D22626" stroke-width="1"/>
+    <text x="262" y="463" class="f-cota">7.5 cm</text>
+    <text x="262" y="472" class="f-cota">desde escote</text>
+    <rect id="ARTE_EN_MOLDE" x="184" y="482" width="36" height="40" fill="#FAFAFA" stroke="#111111" stroke-width="0.9"/>
+
+    <!-- 5 Muestras de Color (Swatches) -->
+    <rect id="MUESTRA_COLOR_1" x="38"  y="715" width="42" height="42" fill="#111111" stroke="#111111" stroke-width="0.9"/>
+    <rect id="MUESTRA_COLOR_2" x="148" y="715" width="42" height="42" fill="#00A8E8" stroke="#111111" stroke-width="0.9"/>
+    <rect id="MUESTRA_COLOR_3" x="258" y="715" width="42" height="42" fill="#FFFFFF" stroke="#111111" stroke-width="0.9"/>
+    <rect id="MUESTRA_COLOR_4" x="368" y="715" width="42" height="42" fill="#F2645A" stroke="#111111" stroke-width="0.9"/>
+    <rect id="MUESTRA_COLOR_5" x="478" y="715" width="42" height="42" fill="#F5D426" stroke="#111111" stroke-width="0.9"/>
+  </g>
+
+  <!-- CAPA 5: DATOS EDITABLES (LEÍDOS AUTOMÁTICAMENTE POR LA APP) -->
+  <g id="5_DATOS_EDITABLES_APP">
+    <text id="CAMPO_REFERENCIA"     x="282" y="36" class="f-val">REF-2026-089</text>
+    <text id="CAMPO_PROCESO"        x="404" y="36" class="f-val">ESTAMPACIÓN</text>
+    <text id="CAMPO_PIEZA"          x="520" y="36" class="f-val">DELANTERO</text>
+
+    <text id="CAMPO_TELA_BASE"      x="275" y="58" class="f-val">JERSEY ALGODÓN</text>
+    <text id="CAMPO_TIPO_LOGO"      x="408" y="58" class="f-val">PECHO / ESPALDA</text>
+    <text id="CAMPO_NUM_PIEZAS"     x="533" y="58" class="f-val">1</text>
+
+    <text id="CAMPO_NUM_ESTAMPADOS" x="292" y="80" class="f-val">1</text>
+    <text id="CAMPO_FOIL"           x="386" y="80" class="f-val">NO</text>
+    <text id="CAMPO_ALTA_DENSI"     x="542" y="80" class="f-val">SI</text>
+
+    <!-- Medidas y % Cubrimiento -->
+    <text id="CAMPO_ANCHO_CM"         x="388" y="416" class="f-sub">24</text>
+    <text id="CAMPO_ALTO_CM"          x="458" y="416" class="f-sub">28</text>
+    <text id="CAMPO_PORC_CUBRIMIENTO" x="524" y="416" class="f-sub">35%</text>
+
+    <!-- Observaciones Técnicas -->
+    <text id="CAMPO_OBSERVACIONES" x="354" y="514" class="f-obs">
+      <tspan x="354" dy="0">• Tacto suave / verificar registro de alta densidad.</tspan>
+      <tspan x="354" dy="15">• Ubicación a 7.5 cm desde el escote delantero.</tspan>
+      <tspan x="354" dy="15">• Temperatura de curado estándar 160°C.</tspan>
+      <tspan x="354" dy="15">• No planchar directamente sobre el estampado.</tspan>
+    </text>
+
+    <!-- Datos de las 5 Tarjetas de Color -->
+    <text id="COLOR_1_MAT" x="84"  y="728" class="f-sw-v">PLASTISOL</text>
+    <text id="COLOR_1_PMS" x="84"  y="745" class="f-sw-v">19-4007 TCX</text>
+    <text id="COLOR_1_NOM" x="84"  y="756" class="f-sw-v">BLACK</text>
+
+    <text id="COLOR_2_MAT" x="194" y="728" class="f-sw-v">PLASTISOL</text>
+    <text id="COLOR_2_PMS" x="194" y="745" class="f-sw-v">15-4722 TCX</text>
+    <text id="COLOR_2_NOM" x="194" y="756" class="f-sw-v">CYAN BLUE</text>
+
+    <text id="COLOR_3_MAT" x="304" y="728" class="f-sw-v">PLASTISOL</text>
+    <text id="COLOR_3_PMS" x="304" y="745" class="f-sw-v">11-0601 TCX</text>
+    <text id="COLOR_3_NOM" x="304" y="756" class="f-sw-v">WHITE</text>
+
+    <text id="COLOR_4_MAT" x="414" y="728" class="f-sw-v">PLASTISOL</text>
+    <text id="COLOR_4_PMS" x="414" y="745" class="f-sw-v">17-1753 TCX</text>
+    <text id="COLOR_4_NOM" x="414" y="756" class="f-sw-v">CORAL RED</text>
+
+    <text id="COLOR_5_MAT" x="524" y="728" class="f-sw-v">PLASTISOL</text>
+    <text id="COLOR_5_PMS" x="524" y="745" class="f-sw-v">13-0858 TCX</text>
+    <text id="COLOR_5_NOM" x="524" y="756" class="f-sw-v">YELLOW</text>
+  </g>
+</svg>
