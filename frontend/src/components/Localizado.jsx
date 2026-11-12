@@ -5,12 +5,29 @@ import {
   AlertCircle, Loader2, Image as ImageIcon,
   Palette, ChevronRight, ChevronLeft,
   Download, MousePointer2,
-  Brush, Zap, Layout, Clock, Check,
-  Sparkles, X, Upload
+  Brush, Layout, Clock, Check,
+  Sparkles, X, Upload, FolderOpen
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.DEV ? 'http://localhost:8000/api' : '/api';
-export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
+
+function getBrandAccent(marca) {
+  const m = (marca || '').toUpperCase();
+  if (m.includes('LIVVA') && m.includes('AZZ')) return { color: '#0284c7', bg: '#e0f2fe', border: '#38bdf8', label: 'Azz Livv' };
+  if (m.includes('LIVVA')) return { color: '#8b5cf6', bg: '#f3e8ff', border: '#c084fc', label: 'Livva' };
+  if (m.includes('AZZORTI') || m.includes('DUPREE')) return { color: '#e11d48', bg: '#ffe4e6', border: '#fb7185', label: 'Azzorti' };
+  return { color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe', label: marca || 'AG LAB' };
+}
+
+export default function Localizado({
+  opciones,
+  onBack,
+  onQueueTask,
+  isLocal,
+  selectedBrand,
+  onSelectBrand,
+  selectedDesigner
+}) {
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
@@ -38,11 +55,33 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
   const [colores, setColores] = useState([{ material: '', pantone: '', color: '' }]);
   const [images, setImages] = useState({ img_ropero_cad: null, img_pantallazo_molde: null });
 
+  // Sync top hybrid bar brand filter with formData.marca
+  useEffect(() => {
+    if (selectedBrand && selectedBrand !== 'ALL') {
+      const match = (opciones.marca || []).find(
+        m => m.toUpperCase() === selectedBrand.toUpperCase() || m.toUpperCase().includes(selectedBrand.toUpperCase())
+      );
+      setFormData(prev => ({ ...prev, marca: match || selectedBrand }));
+    }
+  }, [selectedBrand, opciones.marca]);
 
+  // Sync selected designer from crew bar
+  useEffect(() => {
+    if (selectedDesigner) {
+      if (selectedDesigner.type === 'GRAFICO') {
+        setFormData(prev => ({ ...prev, dis_grafico: selectedDesigner.name }));
+      } else if (selectedDesigner.type === 'MODA') {
+        setFormData(prev => ({ ...prev, dis_moda: selectedDesigner.name }));
+      }
+    }
+  }, [selectedDesigner]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    if (name === 'marca' && onSelectBrand) {
+      onSelectBrand(value || 'ALL');
+    }
   };
 
   const handlePaste = (e, field) => {
@@ -98,7 +137,7 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
 
   const handleSubmit = async () => {
     if (!images.img_ropero_cad || !images.img_pantallazo_molde) {
-      setMessage({ type: 'error', text: 'Sube ambas imágenes para continuar.' });
+      setMessage({ type: 'error', text: 'Sube ambas imágenes (Ropero CAD 2D y Pantallazo Molde) para continuar.' });
       return;
     }
 
@@ -114,9 +153,9 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
         if (onQueueTask) {
           onQueueTask(res.data.task_id);
         }
-        setMessage({ 
-          type: 'success', 
-          text: `Ficha de referencia ${formData.referencia || ''} agregada a la cola. Se guardará localmente y se descargará automáticamente al finalizar.` 
+        setMessage({
+          type: 'success',
+          text: `Ficha de referencia ${formData.referencia || 'SIN-REF'} agregada a la cola. Se guardará localmente y se descargará automáticamente al finalizar.`
         });
         setStep(5);
       } else {
@@ -131,65 +170,127 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
   };
 
   const steps = [
-    { id: 1, title: 'Diseño', icon: <Brush className="w-4 h-4" /> },
-    { id: 2, title: 'Técnico', icon: <Layout className="w-4 h-4" /> },
-    { id: 3, title: 'Visual', icon: <ImageIcon className="w-4 h-4" /> },
-    { id: 4, title: 'Color', icon: <Palette className="w-4 h-4" /> }
+    { id: 1, title: '1. Diseño', icon: <Brush className="w-3.5 h-3.5" /> },
+    { id: 2, title: '2. Técnico', icon: <Layout className="w-3.5 h-3.5" /> },
+    { id: 3, title: '3. Visual', icon: <ImageIcon className="w-3.5 h-3.5" /> },
+    { id: 4, title: '4. Color', icon: <Palette className="w-3.5 h-3.5" /> }
   ];
 
+  const brandTheme = getBrandAccent(formData.marca);
+
   return (
-    <div className="w-full max-w-3xl slide-up">
-      <header className="mb-12 text-center">
-        <button onClick={onBack} className="mb-4 text-xs font-bold text-white/60 hover:text-white flex items-center gap-2 mx-auto bg-white/10 px-4 py-2 rounded-full transition-all">
-          <ChevronLeft className="w-3 h-3" /> VOLVER AL MENÚ
-        </button>
-        <div className="inline-flex items-center gap-3 bg-white/30 backdrop-blur-md px-6 py-3 rounded-full border border-white/50 shadow-sm mb-6">
-          <h1 className="font-outfit text-2xl font-black text-white tracking-tight">Estampado <span className="text-indigo-400">Localizado</span></h1>
+    <div className="w-full slide-up">
+      {/* Editorial Header Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onBack}
+            className="btn-editorial-outline py-1.5 px-3 text-xs"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" /> Volver al Estudio
+          </button>
+          <div>
+            <span className="text-[10px] font-extrabold uppercase tracking-[2px] text-[#64748b] block">
+              MÓDULO POSICIONAL • AG LAB
+            </span>
+            <h1 className="text-xl font-extrabold text-[#0f172a] tracking-tight">
+              Ficha Técnica de Estampado Localizado
+            </h1>
+          </div>
         </div>
-        <div className="flex flex-wrap justify-center gap-3">
+
+        {/* Stepper Pills */}
+        <div className="flex flex-wrap items-center gap-2">
           {steps.map((s) => (
-            <div key={s.id} className={`step-pill flex items-center gap-2 ${step === s.id ? 'pill-active' : 'pill-inactive'}`}>
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => step < 5 && setStep(s.id)}
+              className={`step-pill flex items-center gap-1.5 ${step === s.id ? 'pill-active' : 'pill-inactive'}`}
+            >
               {s.icon} <span>{s.title}</span>
-            </div>
+            </button>
           ))}
         </div>
-      </header>
+      </div>
 
-      <div className="creative-card min-h-[600px] flex flex-col relative overflow-hidden">
+      {/* Main Editorial Sheet Card */}
+      <div
+        className="creative-card min-h-[560px] flex flex-col relative overflow-hidden"
+        style={{ borderLeft: `4px solid ${brandTheme.color}` }}
+      >
+        {/* Top Metadata Strip inside Sheet */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-4 mb-6 border-b border-[#f1f5f9]">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span
+              className="camp-pill"
+              style={{
+                background: brandTheme.bg,
+                color: brandTheme.color,
+                borderColor: brandTheme.border
+              }}
+            >
+              #{brandTheme.label.toUpperCase()}
+            </span>
+            <span className="camp-pill camp-pill-neutral">
+              #REF:{formData.referencia || 'PENDIENTE'}
+            </span>
+            {formData.campana && (
+              <span className="camp-pill camp-pill-neutral">
+                #CAMP:{formData.campana}
+              </span>
+            )}
+            {formData.porc_cubrimiento && (
+              <span className="camp-pill" style={{ background: '#ecfdf5', color: '#047857', borderColor: '#a7f3d0' }}>
+                #CUBRIMIENTO:{formData.porc_cubrimiento}
+              </span>
+            )}
+          </div>
+          <span className="text-[11px] font-bold text-[#64748b]" style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>
+            PASO {Math.min(step, 4)} DE 4 • {colores.length} {colores.length === 1 ? 'COLOR' : 'COLORES'}
+          </span>
+        </div>
+
         {submitting && (
-          <div className="absolute inset-0 bg-white/80 backdrop-blur-md z-50 flex flex-col items-center justify-center p-12 text-center">
-            <div className="w-24 h-24 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin mb-6" />
-            <h3 className="text-2xl font-black text-slate-900">{statusMsg}</h3>
+          <div className="absolute inset-0 bg-white/90 backdrop-blur-xs z-50 flex flex-col items-center justify-center p-12 text-center">
+            <div className="w-14 h-14 border-3 border-[#e2e8f0] border-t-[#000000] rounded-full animate-spin mb-4" />
+            <h3 className="text-lg font-extrabold text-[#0f172a]">{statusMsg}</h3>
           </div>
         )}
 
         {message && step !== 5 && (
-          <div className="mb-8 p-6 rounded-[24px] bg-rose-50 border-2 border-rose-100 text-rose-600 flex items-center gap-4">
-            <AlertCircle className="w-6 h-6" />
-            <p className="font-bold text-sm uppercase">{message.text}</p>
+          <div className="mb-6 p-4 rounded-xl bg-[#fef2f2] border border-[#fecaca] text-[#ef4444] flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            <p className="font-bold text-xs uppercase tracking-wide">{message.text}</p>
           </div>
         )}
 
         {step === 1 && (
-          <div className="space-y-10 flex-1">
+          <div className="space-y-6 flex-1">
             <div>
-              <h2 className="font-outfit text-4xl font-black text-slate-900 mb-3">Esencia del Diseño</h2>
-              <p className="text-slate-400 font-medium">Define el ADN creativo de esta ficha.</p>
+              <span className="text-[10px] font-extrabold uppercase tracking-[2px] text-[#64748b]">
+                SECCIÓN 01 • METADATOS EDITORIALES
+              </span>
+              <h2 className="text-2xl font-extrabold text-[#000000] tracking-tight mt-0.5">
+                Esencia del Diseño &amp; Clasificación
+              </h2>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {isLocal ? (
-                <div className="md:col-span-2">
-                  <label className="label-creative">Carpeta de Destino</label>
+                <div className="md:col-span-2 lg:col-span-3 bg-[#f8fafc] p-4 rounded-xl border border-[#e2e8f0]">
+                  <label className="label-creative">Carpeta de Destino Local</label>
                   <div className="flex gap-2">
-                    <input 
-                      type="text" 
-                      name="output_folder" 
-                      className="input-creative flex-1" 
-                      value={formData.output_folder} 
-                      onChange={handleInputChange} 
-                      placeholder="Dejar vacío para usar carpeta /output" 
+                    <input
+                      type="text"
+                      name="output_folder"
+                      className="input-creative flex-1"
+                      value={formData.output_folder}
+                      onChange={handleInputChange}
+                      placeholder="Por defecto se guardará en la carpeta /output del proyecto"
                     />
-                    <button 
+                    <button
                       type="button"
                       onClick={async () => {
                         try {
@@ -201,19 +302,21 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
                           console.error("Error seleccionando carpeta", err);
                         }
                       }}
-                      className="px-4 bg-slate-100 hover:bg-indigo-100 text-indigo-600 rounded-2xl transition-colors border-2 border-slate-200"
+                      className="btn-editorial-outline px-4"
                       title="Seleccionar Carpeta"
                     >
-                      <Layout className="w-5 h-5" />
+                      <FolderOpen className="w-4 h-4 text-[#4f46e5]" />
+                      <span>Explorar...</span>
                     </button>
                   </div>
                 </div>
               ) : (
-                <div className="md:col-span-2 p-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl text-indigo-800 text-[10px] font-black uppercase tracking-wider flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-indigo-500 animate-pulse" />
-                  <span>Modo Web: Los archivos se descargarán de forma directa en tu computadora al finalizar.</span>
+                <div className="md:col-span-2 lg:col-span-3 p-3.5 bg-[#eef2ff] border border-[#c7d2fe] rounded-xl text-[#4338ca] text-xs font-bold flex items-center gap-2.5">
+                  <Clock className="w-4 h-4 text-[#4f46e5] shrink-0" />
+                  <span>Modo Web Activo: El archivo .xlsm se descargará automáticamente en tu navegador al finalizar.</span>
                 </div>
               )}
+
               {[
                 { label: 'Marca', name: 'marca', options: opciones.marca },
                 { label: 'Línea', name: 'linea', options: opciones.linea },
@@ -228,7 +331,12 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
               ].map((f) => (
                 <div key={f.name}>
                   <label className="label-creative">{f.label}</label>
-                  <select name={f.name} className="input-creative appearance-none" value={formData[f.name]} onChange={handleInputChange}>
+                  <select
+                    name={f.name}
+                    className="input-creative"
+                    value={formData[f.name]}
+                    onChange={handleInputChange}
+                  >
                     <option value="">Seleccionar...</option>
                     {f.options?.map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
@@ -239,26 +347,68 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
         )}
 
         {step === 2 && (
-          <div className="space-y-10 flex-1">
-            <h2 className="font-outfit text-4xl font-black text-slate-900 mb-3">Construcción Técnica</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-6 flex-1">
+            <div>
+              <span className="text-[10px] font-extrabold uppercase tracking-[2px] text-[#64748b]">
+                SECCIÓN 02 • ESPECIFICACIONES DE INGENIERÍA
+              </span>
+              <h2 className="text-2xl font-extrabold text-[#000000] tracking-tight mt-0.5">
+                Construcción Técnica &amp; Dimensiones
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               <div className="md:col-span-2">
                 <label className="label-creative">Tela Base</label>
-                <input list="telas" name="tela_base" className="input-creative" value={formData.tela_base} onChange={handleInputChange} placeholder="Busca la tela..." />
-                <datalist id="telas">{opciones.tela_base?.map(t => <option key={t} value={t} />)}</datalist>
+                <input
+                  list="telas"
+                  name="tela_base"
+                  className="input-creative"
+                  value={formData.tela_base}
+                  onChange={handleInputChange}
+                  placeholder="Escribe o selecciona la tela base..."
+                />
+                <datalist id="telas">
+                  {opciones.tela_base?.map(t => <option key={t} value={t} />)}
+                </datalist>
               </div>
-              <div><label className="label-creative">Referencia</label><input type="text" name="referencia" className="input-creative" value={formData.referencia} onChange={handleInputChange} /></div>
-              <div><label className="label-creative"># Piezas</label><input type="text" name="num_piezas" className="input-creative" value={formData.num_piezas} onChange={handleInputChange} /></div>
+
+              <div>
+                <label className="label-creative">Referencia</label>
+                <input
+                  type="text"
+                  name="referencia"
+                  className="input-creative"
+                  style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}
+                  value={formData.referencia}
+                  onChange={handleInputChange}
+                  placeholder="Ej: REF-2026-01"
+                />
+              </div>
+
+              <div>
+                <label className="label-creative"># Piezas</label>
+                <input
+                  type="text"
+                  name="num_piezas"
+                  className="input-creative"
+                  style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}
+                  value={formData.num_piezas}
+                  onChange={handleInputChange}
+                  placeholder="Ej: 1"
+                />
+              </div>
+
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="label-creative mb-0">% Cubrimiento</label>
                   <button
                     type="button"
                     onClick={() => setShowCubrimientoModal(true)}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200 transition-colors shadow-sm"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider rounded-full bg-[#eef2ff] text-[#4f46e5] hover:bg-[#e0e7ff] border border-[#c7d2fe] transition-colors cursor-pointer"
                     title="Calcular % automáticamente a partir del arte del estampado"
                   >
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                    <Sparkles className="w-3 h-3 text-[#4f46e5]" />
                     <span>Calcular con Arte</span>
                   </button>
                 </div>
@@ -266,9 +416,10 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
                   type="text"
                   name="porc_cubrimiento"
                   className="input-creative w-full"
+                  style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}
                   value={formData.porc_cubrimiento}
                   onChange={handleInputChange}
-                  placeholder="Ej: 25%"
+                  placeholder="Ej: 25% (o pega imagen Ctrl+V)"
                   onPaste={(e) => {
                     const items = (e.clipboardData || e.originalEvent.clipboardData).items;
                     for (let i = 0; i < items.length; i++) {
@@ -283,7 +434,7 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
                   }}
                 />
                 {cubrimientoInfo && (
-                  <p className="text-[10px] text-emerald-600 font-bold mt-1.5 flex items-center gap-1">
+                  <p className="text-[10px] text-[#059669] font-bold mt-1 flex items-center gap-1">
                     <Check className="w-3.5 h-3.5" />
                     <span>
                       Calculado: {cubrimientoInfo.porcentaje_texto} (Real: {cubrimientoInfo.porcentaje_real}% • Fondo: {cubrimientoInfo.tiene_transparencia ? "Transparente" : cubrimientoInfo.color_fondo_hex})
@@ -291,32 +442,104 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
                   </p>
                 )}
               </div>
+
               <div>
                 <label className="label-creative"># Estampados</label>
-                <select name="num_estampados" className="input-creative appearance-none" value={formData.num_estampados} onChange={handleInputChange}>
+                <select
+                  name="num_estampados"
+                  className="input-creative"
+                  value={formData.num_estampados}
+                  onChange={handleInputChange}
+                >
                   <option value="">-</option>
                   {opciones.num_estampado?.map(o => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
-              <div><label className="label-creative">Ancho (CM)</label><input type="text" name="ancho_cm" className="input-creative" value={formData.ancho_cm} onChange={handleInputChange} /></div>
-              <div><label className="label-creative">Alto (CM)</label><input type="text" name="alto_cm" className="input-creative" value={formData.alto_cm} onChange={handleInputChange} /></div>
-              <div className="md:col-span-2"><label className="label-creative">Notas</label><textarea name="observaciones" className="input-creative h-20 resize-none" value={formData.observaciones} onChange={handleInputChange} /></div>
+
+              <div>
+                <label className="label-creative">Ancho (CM)</label>
+                <input
+                  type="text"
+                  name="ancho_cm"
+                  className="input-creative"
+                  style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}
+                  value={formData.ancho_cm}
+                  onChange={handleInputChange}
+                  placeholder="Ej: 24"
+                />
+              </div>
+
+              <div>
+                <label className="label-creative">Alto (CM)</label>
+                <input
+                  type="text"
+                  name="alto_cm"
+                  className="input-creative"
+                  style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}
+                  value={formData.alto_cm}
+                  onChange={handleInputChange}
+                  placeholder="Ej: 28"
+                />
+              </div>
+
+              <div>
+                <label className="label-creative">Alta Densidad</label>
+                <select
+                  name="alta_densi"
+                  className="input-creative"
+                  value={formData.alta_densi}
+                  onChange={handleInputChange}
+                >
+                  <option value="">Seleccionar...</option>
+                  {(opciones.alta_densi || ['SI', 'NO']).map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+
+              <div className="md:col-span-2 lg:col-span-3">
+                <label className="label-creative">Observaciones Técnicas</label>
+                <textarea
+                  name="observaciones"
+                  className="input-creative h-24 resize-none"
+                  value={formData.observaciones}
+                  onChange={handleInputChange}
+                  placeholder="Especificaciones de ubicación, tacto, temperatura o detalles especiales..."
+                />
+              </div>
             </div>
           </div>
         )}
 
         {step === 3 && (
-          <div className="space-y-10 flex-1">
-            <h2 className="font-outfit text-4xl font-black text-slate-900 mb-3">Moodboard Visual</h2>
-            <div className="grid grid-cols-1 gap-8">
+          <div className="space-y-6 flex-1">
+            <div>
+              <span className="text-[10px] font-extrabold uppercase tracking-[2px] text-[#64748b]">
+                SECCIÓN 03 • REGISTRO GRÁFICO
+              </span>
+              <h2 className="text-2xl font-extrabold text-[#000000] tracking-tight mt-0.5">
+                Ropero CAD 2D &amp; Pantallazo de Molde
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {[
-                { label: 'Ropero CAD 2D', field: 'img_ropero_cad', ref: fileInputRopero, icon: <ImageIcon /> },
-                { label: 'Pantallazo Molde', field: 'img_pantallazo_molde', ref: fileInputMolde, icon: <MousePointer2 /> }
+                { label: '1. Ropero CAD 2D', field: 'img_ropero_cad', ref: fileInputRopero, icon: <ImageIcon /> },
+                { label: '2. Pantallazo Molde', field: 'img_pantallazo_molde', ref: fileInputMolde, icon: <MousePointer2 /> }
               ].map((box) => (
-                <div key={box.field} className="space-y-4">
-                  <label className="label-creative">{box.label}</label>
+                <div key={box.field} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="label-creative mb-0">{box.label}</label>
+                    {images[box.field] && (
+                      <button
+                        type="button"
+                        onClick={() => setImages(prev => ({ ...prev, [box.field]: null }))}
+                        className="text-[11px] font-bold text-[#e11d48] hover:underline"
+                      >
+                        Quitar imagen
+                      </button>
+                    )}
+                  </div>
                   <div
-                    className={`upload-area h-64 outline-none ${activeField === box.field ? 'ring-4 ring-indigo-400 border-indigo-500' : ''}`}
+                    className={`upload-area h-72 outline-none ${activeField === box.field ? 'ring-3 ring-[#4f46e5]/30 border-[#4f46e5]' : ''}`}
                     onPaste={(e) => handlePaste(e, box.field)}
                     onFocus={() => setActiveField(box.field)}
                     onBlur={() => setActiveField(null)}
@@ -324,16 +547,19 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
                     tabIndex="0"
                   >
                     {images[box.field] ? (
-                      <img src={images[box.field]} className="w-full h-full object-contain p-4" />
+                      <img src={images[box.field]} alt={box.label} className="w-full h-full object-contain p-2" />
                     ) : (
-                      <div className="flex flex-col items-center">
-                        <div className="w-12 h-12 bg-white shadow-xl rounded-2xl flex items-center justify-center mb-4">
-                          {React.cloneElement(box.icon, { className: "w-6 h-6 text-indigo-400" })}
+                      <div className="flex flex-col items-center text-center">
+                        <div className="w-12 h-12 bg-white border border-[#e2e8f0] shadow-xs rounded-xl flex items-center justify-center mb-3">
+                          {React.cloneElement(box.icon, { className: "w-5 h-5 text-[#0f172a]" })}
                         </div>
-                        <p className="text-slate-400 font-bold uppercase tracking-widest text-[8px]">Haz clic o Pega aquí</p>
+                        <p className="text-[#0f172a] font-extrabold text-xs uppercase tracking-wider mb-1">
+                          Haz clic para subir archivo
+                        </p>
+                        <span className="camp-pill">o pega aquí con Ctrl + V</span>
                       </div>
                     )}
-                    <input type="file" ref={box.ref} className="hidden" onChange={(e) => handleFileChange(e, box.field)} />
+                    <input type="file" ref={box.ref} className="hidden" accept="image/*" onChange={(e) => handleFileChange(e, box.field)} />
                   </div>
                 </div>
               ))}
@@ -342,18 +568,87 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
         )}
 
         {step === 4 && (
-          <div className="space-y-10 flex-1">
+          <div className="space-y-6 flex-1">
             <div className="flex items-center justify-between">
-              <h2 className="font-outfit text-4xl font-black text-slate-900">Armonía de Color</h2>
-              <button onClick={() => setColores([...colores, { material: '', pantone: '', color: '' }])} className="w-12 h-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-lg"><Plus /></button>
+              <div>
+                <span className="text-[10px] font-extrabold uppercase tracking-[2px] text-[#64748b]">
+                  SECCIÓN 04 • ESPECIFICACIÓN CROMÁTICA
+                </span>
+                <h2 className="text-2xl font-extrabold text-[#000000] tracking-tight mt-0.5">
+                  Armonía de Color &amp; Pantones
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setColores([...colores, { material: '', pantone: '', color: '' }])}
+                className="btn-editorial-dark"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Agregar Color</span>
+              </button>
             </div>
-            <div className="space-y-4">
+
+            <div className="space-y-3">
               {colores.map((c, i) => (
-                <div key={i} className="flex gap-4 p-4 bg-slate-50/50 rounded-2xl border-2 border-slate-100">
-                  <select className="input-creative flex-1" value={c.material} onChange={(e) => { const n = [...colores]; n[i].material = e.target.value; setColores(n); }}><option value="">Material...</option>{opciones.material?.map(o => <option key={o} value={o}>{o}</option>)}</select>
-                  <input type="text" className="input-creative flex-1" value={c.pantone} onChange={(e) => { const n = [...colores]; n[i].pantone = e.target.value; setColores(n); }} placeholder="Pantone" />
-                  <input type="text" className="input-creative flex-1" value={c.color} onChange={(e) => { const n = [...colores]; n[i].color = e.target.value; setColores(n); }} placeholder="Color" />
-                  <button onClick={() => setColores(colores.filter((_, idx) => idx !== i))} className="text-rose-500"><Trash2 className="w-5 h-5" /></button>
+                <div
+                  key={i}
+                  className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center p-3.5 bg-[#f8fafc] rounded-xl border border-[#e2e8f0]"
+                  style={{ borderLeft: '4px solid #0f172a' }}
+                >
+                  <div className="md:col-span-1">
+                    <span className="camp-pill camp-pill-neutral">#{i + 1}</span>
+                  </div>
+                  <div className="md:col-span-4">
+                    <select
+                      className="input-creative"
+                      value={c.material}
+                      onChange={(e) => {
+                        const n = [...colores];
+                        n[i].material = e.target.value;
+                        setColores(n);
+                      }}
+                    >
+                      <option value="">Material / Base...</option>
+                      {opciones.material?.map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </div>
+                  <div className="md:col-span-3">
+                    <input
+                      type="text"
+                      className="input-creative"
+                      style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}
+                      value={c.pantone}
+                      onChange={(e) => {
+                        const n = [...colores];
+                        n[i].pantone = e.target.value;
+                        setColores(n);
+                      }}
+                      placeholder="Código Pantone (TCX/C)"
+                    />
+                  </div>
+                  <div className="md:col-span-3">
+                    <input
+                      type="text"
+                      className="input-creative"
+                      value={c.color}
+                      onChange={(e) => {
+                        const n = [...colores];
+                        n[i].color = e.target.value;
+                        setColores(n);
+                      }}
+                      placeholder="Nombre del Color"
+                    />
+                  </div>
+                  <div className="md:col-span-1 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setColores(colores.filter((_, idx) => idx !== i))}
+                      className="p-2 text-[#64748b] hover:text-[#e11d48] hover:bg-[#ffe4e6] rounded-lg transition-colors"
+                      title="Eliminar fila de color"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -361,52 +656,97 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
         )}
 
         {step === 5 && (
-          <div className="flex flex-col items-center justify-center py-20 text-center flex-1">
-            <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mb-6"><CheckCircle className="w-10 h-10" /></div>
-            <h2 className="text-4xl font-black text-slate-900 mb-2">¡Éxito!</h2>
-            <p className="text-slate-400 mb-10">{message?.text}</p>
-            <button onClick={() => setStep(1)} className="btn-creative btn-next px-10">Nueva Ficha</button>
+          <div className="flex flex-col items-center justify-center py-14 text-center flex-1">
+            <div className="w-16 h-16 bg-[#f0fdf4] text-[#22c55e] border border-[#bbf7d0] rounded-full flex items-center justify-center mb-5">
+              <CheckCircle className="w-8 h-8" />
+            </div>
+            <span className="login-eyebrow">PROCESO EN COLA</span>
+            <h2 className="text-2xl font-extrabold text-[#000000] mb-2">¡Ficha Técnica Encolada con Éxito!</h2>
+            <p className="text-[#475569] max-w-md mb-8 text-sm">{message?.text}</p>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setStep(1)} className="btn-creative btn-next">
+                Crear Nueva Ficha Localizada
+              </button>
+              <button onClick={onBack} className="btn-creative btn-back">
+                Volver al Estudio
+              </button>
+            </div>
           </div>
         )}
 
         {step < 5 && (
-          <div className="mt-12 flex gap-4">
-            <button onClick={() => setStep(s => s - 1)} disabled={step === 1} className="btn-creative btn-back flex-1 justify-center disabled:opacity-0"><ChevronLeft /> Atrás</button>
+          <div className="mt-8 pt-5 border-t border-[#f1f5f9] flex items-center justify-between gap-4">
+            <button
+              type="button"
+              onClick={() => setStep(s => s - 1)}
+              disabled={step === 1}
+              className="btn-creative btn-back disabled:opacity-0"
+            >
+              <ChevronLeft className="w-4 h-4" /> Anterior
+            </button>
+
             {step < 4 ? (
-              <button onClick={() => setStep(s => s + 1)} className="btn-creative btn-next flex-1 justify-center">Continuar <ChevronRight /></button>
+              <button
+                type="button"
+                onClick={() => setStep(s => s + 1)}
+                className="btn-creative btn-next"
+              >
+                Siguiente Paso <ChevronRight className="w-4 h-4" />
+              </button>
             ) : (
-              <button onClick={handleSubmit} disabled={submitting} className="btn-creative btn-next flex-[2] justify-center bg-emerald-600">
-                {submitting ? <Loader2 className="animate-spin" /> : <Download />} Finalizar
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="btn-creative btn-next bg-[#10b981] hover:bg-[#059669]"
+              >
+                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                <span>Generar y Descargar Ficha (.XLSM)</span>
               </button>
             )}
           </div>
         )}
+
+        {/* Editorial Card Footer with the 3 Brand Logos */}
+        <footer className="login-footer-brands mt-6 pt-4">
+          <div className="login-brands-track">
+            <img src="/ag-b.png" alt="AG LAB" className="brand-foot-logo logo-agb" style={{ maxHeight: '28px' }} />
+            <span className="brand-foot-divider" />
+            <img src="/AZZORTI.png" alt="AZZORTI" className="brand-foot-logo logo-azzorti" style={{ maxHeight: '16px' }} />
+            <span className="brand-foot-divider" />
+            <img src="/LIVVA.png" alt="LIVVA" className="brand-foot-logo logo-livva" style={{ maxHeight: '15px' }} />
+          </div>
+        </footer>
       </div>
 
       {/* Modal para calcular cubrimiento */}
       {showCubrimientoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-100 relative slide-up">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0f172a]/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl p-7 max-w-md w-full shadow-2xl border border-[#e2e8f0] relative slide-up">
             <button
               type="button"
               onClick={() => setShowCubrimientoModal(false)}
-              className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 transition-colors p-1"
+              className="absolute top-5 right-5 text-[#64748b] hover:text-[#0f172a] transition-colors p-1"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-sm">
-                <Sparkles className="w-6 h-6 text-indigo-600" />
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-11 h-11 rounded-xl bg-[#000000] text-white flex items-center justify-center shadow-xs">
+                <Sparkles className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-outfit text-xl font-black text-slate-900 tracking-tight">Calcular % Cubrimiento</h3>
-                <p className="text-xs text-slate-400 font-medium">Detecta fondo transparente o sólido (CMYK/RGB)</p>
+                <span className="text-[10px] font-extrabold uppercase tracking-[1.8px] text-[#64748b] block">
+                  ANÁLISIS COLORIMÉTRICO CIELAB
+                </span>
+                <h3 className="text-lg font-extrabold text-[#000000] tracking-tight">
+                  Calcular % de Cubrimiento
+                </h3>
               </div>
             </div>
 
             <div
-              className="upload-area h-56 flex flex-col items-center justify-center cursor-pointer border-2 border-dashed border-indigo-200 hover:border-indigo-400 rounded-3xl p-6 transition-all bg-indigo-50/20 outline-none"
+              className="upload-area h-52 flex flex-col items-center justify-center cursor-pointer outline-none"
               onClick={() => fileInputCubrimiento.current?.click()}
               onPaste={(e) => {
                 const items = (e.clipboardData || e.originalEvent.clipboardData).items;
@@ -421,22 +761,20 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
             >
               {analizandoCubrimiento ? (
                 <div className="flex flex-col items-center text-center">
-                  <Loader2 className="w-10 h-10 text-indigo-600 animate-spin mb-3" />
-                  <p className="font-bold text-sm text-slate-800">Analizando cobertura de color...</p>
-                  <p className="text-xs text-slate-400 mt-1">Calculando píxeles de tinta y descartando fondo</p>
+                  <Loader2 className="w-8 h-8 text-[#4f46e5] animate-spin mb-3" />
+                  <p className="font-bold text-sm text-[#0f172a]">Analizando cobertura de tinta...</p>
+                  <p className="text-xs text-[#64748b] mt-1">Descartando fondo y redondeando al 5% superior</p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center text-center">
-                  <div className="w-12 h-12 bg-white shadow-md rounded-2xl flex items-center justify-center mb-3">
-                    <Upload className="w-6 h-6 text-indigo-500" />
+                  <div className="w-11 h-11 bg-white border border-[#e2e8f0] shadow-xs rounded-xl flex items-center justify-center mb-3">
+                    <Upload className="w-5 h-5 text-[#4f46e5]" />
                   </div>
-                  <p className="text-slate-800 font-black text-xs uppercase tracking-wider mb-1">
-                    Haz clic para subir imagen
+                  <p className="text-[#0f172a] font-extrabold text-xs uppercase tracking-wider mb-1.5">
+                    Haz clic para subir el arte aislado
                   </p>
-                  <p className="text-indigo-600 font-extrabold text-[11px] bg-indigo-100/70 px-3 py-1 rounded-full mb-2">
-                    o pega aquí con Ctrl + V
-                  </p>
-                  <p className="text-slate-400 text-[10px]">Acepta PNG (transparente), JPG, CMYK y RGB</p>
+                  <span className="camp-pill mb-2">o pega aquí con Ctrl + V</span>
+                  <p className="text-[#64748b] text-[11px]">Soporta PNG transparente, JPG, CMYK y RGB</p>
                 </div>
               )}
               <input
@@ -451,11 +789,11 @@ export default function Localizado({ opciones, onBack, onQueueTask, isLocal }) {
               />
             </div>
 
-            <div className="mt-4 text-center">
+            <div className="mt-4 flex justify-end">
               <button
                 type="button"
                 onClick={() => setShowCubrimientoModal(false)}
-                className="text-xs font-bold text-slate-400 hover:text-slate-600"
+                className="btn-editorial-outline text-xs py-1.5 px-4"
               >
                 Cancelar
               </button>
