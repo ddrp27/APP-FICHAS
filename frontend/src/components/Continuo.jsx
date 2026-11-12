@@ -1,31 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import axios from 'axios';
 import {
-  Plus, Trash2, CheckCircle, AlertCircle,
-  Loader2, Image as ImageIcon, Palette,
+  Plus, CheckCircle, AlertCircle,
+  Loader2, Image as ImageIcon,
   ChevronRight, ChevronLeft, Download,
-  Brush, Layout, X, Search, Check, Clock, FolderOpen, Layers
+  Brush, Layout, X, Search, Check, Clock, Layers
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.DEV ? 'http://localhost:8000/api' : '/api';
 
-function getBrandAccent(marca) {
-  const m = (marca || '').toUpperCase();
-  if (m.includes('LIVVA') && m.includes('AZZ')) return { color: '#0284c7', bg: '#e0f2fe', border: '#38bdf8', label: 'Azz Livv' };
-  if (m.includes('LIVVA')) return { color: '#8b5cf6', bg: '#f3e8ff', border: '#c084fc', label: 'Livva' };
-  if (m.includes('AZZORTI') || m.includes('DUPREE')) return { color: '#e11d48', bg: '#ffe4e6', border: '#fb7185', label: 'Azzorti' };
-  return { color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe', label: marca || 'AG LAB' };
-}
-
-export default function Continuo({
-  opciones,
-  onBack,
-  onQueueTask,
-  isLocal,
-  selectedBrand,
-  onSelectBrand,
-  selectedDesigner
-}) {
+export default function Continuo({ opciones, onBack, onQueueTask, isLocal }) {
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState(null);
@@ -43,27 +27,6 @@ export default function Continuo({
   const [telasSeleccionadas, setTelasSeleccionadas] = useState([]);
   const [showTelaSearch, setShowTelaSearch] = useState(false);
 
-  // Sync top hybrid bar brand filter with globalData.marca
-  useEffect(() => {
-    if (selectedBrand && selectedBrand !== 'ALL') {
-      const match = (opciones.marca || []).find(
-        m => m.toUpperCase() === selectedBrand.toUpperCase() || m.toUpperCase().includes(selectedBrand.toUpperCase())
-      );
-      setGlobalData(prev => ({ ...prev, marca: match || selectedBrand }));
-    }
-  }, [selectedBrand, opciones.marca]);
-
-  // Sync selected designer from crew bar
-  useEffect(() => {
-    if (selectedDesigner) {
-      if (selectedDesigner.type === 'GRAFICO') {
-        setGlobalData(prev => ({ ...prev, dis_grafico: selectedDesigner.name }));
-      } else if (selectedDesigner.type === 'MODA') {
-        setGlobalData(prev => ({ ...prev, dis_moda: selectedDesigner.name }));
-      }
-    }
-  }, [selectedDesigner]);
-
   const handleNuevaCarga = () => {
     setGlobalData(prev => ({
       ...prev,
@@ -78,9 +41,6 @@ export default function Continuo({
   const handleGlobalChange = (e) => {
     const { name, value } = e.target;
     setGlobalData(prev => ({ ...prev, [name]: value }));
-    if (name === 'marca' && onSelectBrand) {
-      onSelectBrand(value || 'ALL');
-    }
   };
 
   const handlePaste = (e) => {
@@ -125,7 +85,7 @@ export default function Continuo({
 
   const handleSubmit = async () => {
     if (!globalData.imagen_pattern_base64 || telasSeleccionadas.length === 0) {
-      setMessage({ type: 'error', text: 'Sube un pattern y selecciona al menos una tela base.' });
+      setMessage({ type: 'error', text: 'Sube un pattern y selecciona al menos una tela.' });
       return;
     }
 
@@ -167,31 +127,31 @@ export default function Continuo({
   ) || [];
 
   const steps = [
-    { id: 1, title: '1. Datos Globales', icon: <Brush className="w-3.5 h-3.5" /> },
-    { id: 2, title: '2. Bases Textiles', icon: <Layers className="w-3.5 h-3.5" /> },
-    { id: 3, title: '3. Pattern / Rapport', icon: <ImageIcon className="w-3.5 h-3.5" /> }
+    { id: 1, title: 'Datos Globales', icon: <Brush className="w-3.5 h-3.5" /> },
+    { id: 2, title: 'Telas Base', icon: <Layers className="w-3.5 h-3.5" /> },
+    { id: 3, title: 'Pattern', icon: <ImageIcon className="w-3.5 h-3.5" /> }
   ];
-
-  const brandTheme = getBrandAccent(globalData.marca);
 
   return (
     <div className="w-full slide-up">
-      {/* Editorial Header Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
-        <div className="flex items-center gap-3">
+      {/* Editorial Section Header */}
+      <header className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-center gap-3.5">
           <button
             type="button"
             onClick={onBack}
-            className="btn-editorial-outline py-1.5 px-3 text-xs"
+            className="btn-editorial-secondary"
           >
-            <ChevronLeft className="w-3.5 h-3.5" /> Volver al Estudio
+            <ChevronLeft className="w-3.5 h-3.5" />
+            <span>Volver al Menú</span>
           </button>
+
           <div>
-            <span className="text-[10px] font-extrabold uppercase tracking-[2px] text-[#64748b] block">
-              MÓDULO MULTITELA • AG LAB
+            <span className="eyebrow-editorial block" style={{ fontSize: '10px' }}>
+              EQUIPO AG LAB
             </span>
-            <h1 className="text-xl font-extrabold text-[#0f172a] tracking-tight">
-              Ficha Técnica de Estampado Continuo
+            <h1 className="title-editorial-section text-2xl">
+              Estampado Continuo
             </h1>
           </div>
         </div>
@@ -203,116 +163,50 @@ export default function Continuo({
               key={s.id}
               type="button"
               onClick={() => step < 4 && setStep(s.id)}
-              className={`step-pill flex items-center gap-1.5 ${step === s.id ? 'pill-active' : 'pill-inactive'}`}
+              className={`step-pill ${step === s.id ? 'pill-active' : 'pill-inactive'}`}
             >
-              {s.icon} <span>{s.title}</span>
+              {s.icon}
+              <span className="mono-tabular">{s.id}.</span>
+              <span>{s.title}</span>
             </button>
           ))}
         </div>
-      </div>
+      </header>
 
-      {/* Main Editorial Sheet Card */}
+      {/* Editorial Card Container */}
       <div
-        className="creative-card min-h-[560px] flex flex-col relative overflow-hidden"
-        style={{ borderLeft: `4px solid ${brandTheme.color}` }}
+        className="creative-card min-h-[540px] flex flex-col relative overflow-hidden"
+        style={{ borderTop: '3px solid #000000' }}
       >
-        {/* Top Metadata Strip inside Sheet */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-4 mb-6 border-b border-[#f1f5f9]">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span
-              className="camp-pill"
-              style={{
-                background: brandTheme.bg,
-                color: brandTheme.color,
-                borderColor: brandTheme.border
-              }}
-            >
-              #{brandTheme.label.toUpperCase()}
-            </span>
-            <span className="camp-pill camp-pill-neutral">
-              #REF:{globalData.referencia || 'PENDIENTE'}
-            </span>
-            <span className="camp-pill camp-pill-neutral">
-              #PROCESO:{globalData.proceso}
-            </span>
-            <span className="camp-pill" style={{ background: '#ecfdf5', color: '#047857', borderColor: '#a7f3d0' }}>
-              #{telasSeleccionadas.length}_TELAS_SELECCIONADAS
-            </span>
-          </div>
-          <span className="text-[11px] font-bold text-[#64748b]" style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>
-            PASO {Math.min(step, 3)} DE 3 • LOTE MULTITELA
-          </span>
-        </div>
-
         {submitting && (
           <div className="absolute inset-0 bg-white/90 backdrop-blur-xs z-50 flex flex-col items-center justify-center p-12 text-center">
-            <div className="w-14 h-14 border-3 border-[#e2e8f0] border-t-[#000000] rounded-full animate-spin mb-4" />
-            <h3 className="text-lg font-extrabold text-[#0f172a]">
-              Encolando lote de {telasSeleccionadas.length} fichas continuas...
+            <div className="w-14 h-14 border-2 border-[#e2e8f0] border-t-[#4f46e5] rounded-full animate-spin mb-4" />
+            <span className="eyebrow-editorial mb-1">PROCESANDO LOTE</span>
+            <h3 className="text-lg font-extrabold text-[#0f172a] tracking-[-0.3px]">
+              Generando {telasSeleccionadas.length} Fichas...
             </h3>
           </div>
         )}
 
         {message && step !== 4 && (
-          <div className="mb-6 p-4 rounded-xl bg-[#fef2f2] border border-[#fecaca] text-[#ef4444] flex items-center gap-3">
+          <div className="mb-6 p-4 rounded-xl bg-[#fef2f2] border border-[#fecaca] text-[#dc2626] flex items-center gap-3">
             <AlertCircle className="w-5 h-5 shrink-0" />
-            <p className="font-bold text-xs uppercase tracking-wide">{message.text}</p>
+            <p className="font-bold text-xs uppercase tracking-wide m-0">{message.text}</p>
           </div>
         )}
 
         {step === 1 && (
           <div className="space-y-6 flex-1">
             <div>
-              <span className="text-[10px] font-extrabold uppercase tracking-[2px] text-[#64748b]">
-                SECCIÓN 01 • CONFIGURACIÓN DEL LOTE
-              </span>
-              <h2 className="text-2xl font-extrabold text-[#000000] tracking-tight mt-0.5">
-                Datos Globales del Pattern Continuo
-              </h2>
+              <h2 className="title-editorial-section text-2xl">Datos Globales</h2>
+              <p className="text-[#64748b] text-xs font-medium mt-1 m-0">
+                Información compartida por todas las telas que llevarán este pattern continuo.
+              </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {isLocal ? (
-                <div className="md:col-span-2 lg:col-span-3 bg-[#f8fafc] p-4 rounded-xl border border-[#e2e8f0]">
-                  <label className="label-creative">Carpeta de Destino Local</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      name="output_folder"
-                      className="input-creative flex-1"
-                      value={globalData.output_folder}
-                      onChange={handleGlobalChange}
-                      placeholder="Por defecto se guardará en la carpeta /output del proyecto"
-                    />
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        try {
-                          const res = await axios.get(`${API_BASE}/select-folder`);
-                          if (res.data.path) {
-                            setGlobalData(prev => ({ ...prev, output_folder: res.data.path }));
-                          }
-                        } catch (err) {
-                          console.error("Error seleccionando carpeta", err);
-                        }
-                      }}
-                      className="btn-editorial-outline px-4"
-                      title="Seleccionar Carpeta"
-                    >
-                      <FolderOpen className="w-4 h-4 text-[#4f46e5]" />
-                      <span>Explorar...</span>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="md:col-span-2 lg:col-span-3 p-3.5 bg-[#eef2ff] border border-[#c7d2fe] rounded-xl text-[#4338ca] text-xs font-bold flex items-center gap-2.5">
-                  <Clock className="w-4 h-4 text-[#4f46e5] shrink-0" />
-                  <span>Modo Web Activo: Los archivos se descargarán de forma directa (comprimidos en ZIP) al finalizar.</span>
-                </div>
-              )}
-
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {[
-                { label: 'Referencia / Código Pattern', name: 'referencia', type: 'text', mono: true },
+                { label: 'Referencia', name: 'referencia', type: 'text', mono: true },
                 { label: 'Marca', name: 'marca', options: opciones.marca },
                 { label: 'Campaña', name: 'campana', options: opciones.campana },
                 { label: 'Línea', name: 'linea', options: opciones.linea },
@@ -335,18 +229,17 @@ export default function Continuo({
                     <input
                       type="text"
                       name={f.name}
-                      className="input-creative"
-                      style={f.mono ? { fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' } : {}}
+                      className={`input-creative ${f.mono ? 'mono-tabular' : ''}`}
                       value={globalData[f.name]}
                       onChange={handleGlobalChange}
-                      placeholder="Ej: CONT-2026-01"
+                      placeholder="Ej: CONT-104"
                     />
                   )}
                 </div>
               ))}
 
               <div>
-                <label className="label-creative">Proceso Textil</label>
+                <label className="label-creative">Proceso</label>
                 <select
                   name="proceso"
                   className="input-creative"
@@ -358,14 +251,53 @@ export default function Continuo({
                 </select>
               </div>
 
+              {isLocal ? (
+                <div className="md:col-span-2 bg-[#f8fafc] p-4 rounded-xl border border-[#e2e8f0]">
+                  <label className="label-creative">Carpeta de Destino</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      name="output_folder"
+                      className="input-creative flex-1"
+                      value={globalData.output_folder}
+                      onChange={handleGlobalChange}
+                      placeholder="Dejar vacío para usar carpeta /output"
+                    />
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const res = await axios.get(`${API_BASE}/select-folder`);
+                          if (res.data.path) {
+                            setGlobalData(prev => ({ ...prev, output_folder: res.data.path }));
+                          }
+                        } catch (err) {
+                          console.error("Error seleccionando carpeta", err);
+                        }
+                      }}
+                      className="btn-editorial-secondary px-3.5"
+                      title="Seleccionar Carpeta"
+                    >
+                      <Layout className="w-4 h-4 text-[#4f46e5]" />
+                      <span>Explorar</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="md:col-span-2 p-3.5 bg-[#eef2ff] border border-[#c7d2fe] rounded-xl text-[#4338ca] text-xs font-bold flex items-center gap-2.5">
+                  <Clock className="w-4 h-4 text-[#4f46e5] shrink-0" />
+                  <span>Modo Web: Los archivos se descargarán de forma directa (comprimidos en ZIP) al finalizar.</span>
+                </div>
+              )}
+
               <div className="md:col-span-2">
-                <label className="label-creative">Observaciones Globales</label>
+                <label className="label-creative">Observaciones</label>
                 <textarea
                   name="observaciones"
                   className="input-creative h-20 resize-none"
                   value={globalData.observaciones}
                   onChange={handleGlobalChange}
-                  placeholder="Indicaciones de rapport, dirección de hilo, encogimiento o acabados..."
+                  placeholder="Indicaciones de rapport, rotación o acabados..."
                 />
               </div>
             </div>
@@ -375,45 +307,38 @@ export default function Continuo({
         {step === 2 && (
           <div className="space-y-6 flex-1">
             <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-[2px] text-[#64748b]">
-                  SECCIÓN 02 • MATRIZ DE BASES TEXTILES
-                </span>
-                <div className="flex items-center gap-3 mt-0.5">
-                  <h2 className="text-2xl font-extrabold text-[#000000] tracking-tight">
-                    Selección de Telas Base
-                  </h2>
-                  {telasSeleccionadas.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setTelasSeleccionadas([])}
-                      className="preset-pill-btn preset-clear"
-                    >
-                      Limpiar telas ({telasSeleccionadas.length})
-                    </button>
-                  )}
-                </div>
+              <div className="flex items-center gap-3">
+                <h2 className="title-editorial-section text-2xl">Selección de Telas</h2>
+                {telasSeleccionadas.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setTelasSeleccionadas([])}
+                    className="text-[11px] font-bold text-[#dc2626] hover:bg-[#fef2f2] bg-[#ffffff] border border-[#fecaca] px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                  >
+                    Limpiar telas ({telasSeleccionadas.length})
+                  </button>
+                )}
               </div>
 
               <div className="relative">
                 <button
                   type="button"
                   onClick={() => setShowTelaSearch(!showTelaSearch)}
-                  className="btn-editorial-dark"
+                  className="btn-editorial-black"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>+ Añadir Tela Base</span>
+                  <span>+ Añadir Tela</span>
                 </button>
 
                 {showTelaSearch && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white border border-[#cbd5e1] shadow-xl rounded-xl z-50 p-3 max-h-72 flex flex-col">
+                  <div className="absolute right-0 mt-2 w-76 bg-[#ffffff] border border-[#cbd5e1] shadow-2xl rounded-xl z-50 p-3 max-h-68 flex flex-col">
                     <div className="relative mb-2.5">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#64748b]" />
                       <input
                         type="text"
                         autoFocus
                         className="input-creative py-1.5 pl-8 text-xs"
-                        placeholder="Buscar tela por nombre..."
+                        placeholder="Escribe para buscar tela..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                       />
@@ -424,14 +349,14 @@ export default function Continuo({
                           key={t}
                           type="button"
                           onClick={() => addTela(t)}
-                          className="w-full text-left px-3 py-2 hover:bg-[#eef2ff] hover:text-[#4f46e5] rounded-lg text-xs font-bold text-[#0f172a] transition-colors uppercase truncate"
+                          className="w-full text-left px-3 py-2 hover:bg-[#eef2ff] hover:text-[#4f46e5] rounded-lg text-[11px] font-bold text-[#0f172a] transition-colors uppercase truncate cursor-pointer bg-transparent border-0"
                         >
                           {t}
                         </button>
                       ))}
                       {filteredTelas.length === 0 && (
-                        <p className="text-center py-4 text-xs text-[#64748b] font-semibold">
-                          No se encontraron telas con ese filtro
+                        <p className="text-center py-4 text-xs text-[#64748b] font-medium m-0">
+                          No se encontraron telas
                         </p>
                       )}
                     </div>
@@ -440,59 +365,57 @@ export default function Continuo({
               </div>
             </div>
 
-            <div className="space-y-3.5">
+            <div className="space-y-4">
               {telasSeleccionadas.map((tela, idx) => (
                 <div
                   key={idx}
-                  className="p-5 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl space-y-4 slide-up relative"
-                  style={{ borderLeft: '4px solid #000000' }}
+                  className="p-5 bg-[#f8fafc] border border-[#e2e8f0] border-l-4 border-l-[#000000] rounded-xl space-y-4 slide-up relative"
                 >
                   <button
                     type="button"
                     onClick={() => setTelasSeleccionadas(telasSeleccionadas.filter((_, i) => i !== idx))}
-                    className="absolute top-4 right-4 text-[#64748b] hover:text-[#e11d48] p-1 transition-colors"
-                    title="Quitar esta tela"
+                    className="absolute top-4 right-4 text-[#64748b] hover:text-[#dc2626] transition-colors p-1 cursor-pointer bg-transparent border-0"
+                    title="Eliminar tela"
                   >
                     <X className="w-4 h-4" />
                   </button>
 
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="camp-pill camp-pill-neutral">TELA #{idx + 1}</span>
-                    <p className="text-base font-extrabold text-[#000000] tracking-tight">
+                  <div className="flex flex-col gap-1.5">
+                    <span className="label-creative mb-0 text-[10px] text-[#64748b]">Tela Seleccionada</span>
+                    <p className="text-lg font-extrabold text-[#000000] tracking-[-0.3px] m-0">
                       {tela.nombre_tela}
                     </p>
-                    <span className="camp-pill" style={{ background: '#ecfdf5', color: '#047857', borderColor: '#a7f3d0' }}>
-                      ✓ COMPOSICIÓN AUTOMÁTICA
+                    <span className="badge-hashtag badge-hashtag-emerald w-fit mt-1">
+                      <Check className="w-3 h-3" /> COMPOSICIÓN AUTOMÁTICA
                     </span>
                   </div>
 
                   {globalData.proceso === 'ESTAMPACION' && (
                     <div className="space-y-3 pt-3 border-t border-[#e2e8f0]">
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#475569]">
-                          Pantones asignados a esta tela
-                        </span>
+                        <label className="label-creative mb-0 text-[#4f46e5]">
+                          Pantones para esta tela
+                        </label>
                         <button
                           type="button"
                           onClick={() => addPantone(idx)}
-                          className="preset-pill-btn preset-aglab"
+                          className="badge-hashtag cursor-pointer hover:bg-[#e0e7ff]"
                         >
-                          + Añadir Pantone
+                          + AÑADIR COLOR
                         </button>
                       </div>
                       <div className="flex flex-wrap gap-2.5">
                         {tela.pantones.map((p, pIdx) => (
                           <div
                             key={pIdx}
-                            className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-[#cbd5e1] shadow-2xs"
+                            className="flex items-center gap-2 bg-[#ffffff] px-3 py-1.5 rounded-lg border border-[#cbd5e1]"
                           >
                             <input
                               type="text"
-                              className="w-28 outline-none text-xs font-bold text-[#0f172a]"
-                              style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}
+                              className="w-24 outline-none text-xs font-bold text-[#0f172a] mono-tabular"
                               value={p}
                               onChange={(e) => updatePantone(idx, pIdx, e.target.value)}
-                              placeholder="PMS / TCX..."
+                              placeholder="PMS..."
                             />
                             <button
                               type="button"
@@ -501,7 +424,7 @@ export default function Continuo({
                                 newTelas[idx].pantones.splice(pIdx, 1);
                                 setTelasSeleccionadas(newTelas);
                               }}
-                              className="text-[#94a3b8] hover:text-[#e11d48]"
+                              className="text-[#94a3b8] hover:text-[#dc2626] cursor-pointer bg-transparent border-0 p-0"
                             >
                               <X className="w-3.5 h-3.5" />
                             </button>
@@ -515,8 +438,8 @@ export default function Continuo({
 
               {telasSeleccionadas.length === 0 && (
                 <div className="py-16 text-center border-2 border-dashed border-[#cbd5e1] bg-[#f8fafc] rounded-xl">
-                  <p className="text-[#64748b] font-bold uppercase tracking-wider text-xs">
-                    Añade una o más bases textiles usando el botón &ldquo;+ Añadir Tela Base&rdquo;
+                  <p className="text-[#64748b] font-bold uppercase tracking-wider text-xs m-0">
+                    Añade telas usando el botón &ldquo;+ Añadir Tela&rdquo; arriba
                   </p>
                 </div>
               )}
@@ -526,28 +449,17 @@ export default function Continuo({
 
         {step === 3 && (
           <div className="space-y-6 flex-1">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-[2px] text-[#64748b]">
-                  SECCIÓN 03 • ARTE DEL RAPPORT
-                </span>
-                <h2 className="text-2xl font-extrabold text-[#000000] tracking-tight mt-0.5">
-                  Imagen del Pattern Continuo
-                </h2>
-              </div>
-              {globalData.imagen_pattern_base64 && (
-                <button
-                  type="button"
-                  onClick={() => setGlobalData(prev => ({ ...prev, imagen_pattern_base64: '' }))}
-                  className="text-xs font-bold text-[#e11d48] hover:underline"
-                >
-                  Cambiar imagen
-                </button>
-              )}
+            <div>
+              <h2 className="title-editorial-section text-2xl">Imagen del Pattern</h2>
+              <p className="text-[#64748b] text-xs font-medium mt-1 m-0">
+                Haz clic para subir el archivo del módulo o pégalo directamente desde el portapapeles.
+              </p>
             </div>
 
             <div
-              className={`upload-area h-80 outline-none ${activeField ? 'ring-3 ring-[#4f46e5]/30 border-[#4f46e5]' : ''}`}
+              className={`upload-area h-80 outline-none ${
+                activeField ? 'border-[#4f46e5] bg-[#eef2ff]/60 ring-3 ring-[#eef2ff]' : ''
+              }`}
               onPaste={handlePaste}
               onFocus={() => setActiveField(true)}
               onBlur={() => setActiveField(false)}
@@ -555,16 +467,15 @@ export default function Continuo({
               tabIndex="0"
             >
               {globalData.imagen_pattern_base64 ? (
-                <img src={globalData.imagen_pattern_base64} alt="Pattern" className="w-full h-full object-contain p-4" />
+                <img src={globalData.imagen_pattern_base64} alt="Pattern" className="w-full h-full object-contain p-6" />
               ) : (
                 <div className="flex flex-col items-center text-center">
-                  <div className="w-14 h-14 bg-white border border-[#e2e8f0] shadow-xs rounded-xl flex items-center justify-center mb-3">
-                    <ImageIcon className="w-6 h-6 text-[#0f172a]" />
+                  <div className="w-14 h-14 bg-[#ffffff] border border-[#e2e8f0] shadow-xs rounded-2xl flex items-center justify-center mb-4">
+                    <ImageIcon className="w-7 h-7 text-[#4f46e5]" />
                   </div>
-                  <p className="text-[#0f172a] font-extrabold text-xs uppercase tracking-wider mb-1.5">
-                    Haz clic para subir el módulo / pattern
+                  <p className="text-[#0f172a] font-extrabold text-xs uppercase tracking-wider mb-1.5 m-0">
+                    Haz clic para subir o pega el pattern aquí (Ctrl + V)
                   </p>
-                  <span className="camp-pill">o pega directamente con Ctrl + V</span>
                 </div>
               )}
               <input
@@ -586,68 +497,62 @@ export default function Continuo({
         )}
 
         {step === 4 && (
-          <div className="flex flex-col items-center justify-center py-14 text-center flex-1">
-            <div className="w-16 h-16 bg-[#f0fdf4] text-[#22c55e] border border-[#bbf7d0] rounded-full flex items-center justify-center mb-5">
+          <div className="flex flex-col items-center justify-center py-16 text-center flex-1">
+            <div className="w-16 h-16 bg-[#ecfdf5] text-[#059669] border border-[#a7f3d0] rounded-full flex items-center justify-center mb-5">
               <CheckCircle className="w-8 h-8" />
             </div>
-            <span className="login-eyebrow">LOTE EN COLA</span>
-            <h2 className="text-2xl font-extrabold text-[#000000] mb-2">¡Lote de Fichas Continuas Encolado!</h2>
+            <span className="eyebrow-editorial mb-1.5">EQUIPO AG LAB</span>
+            <h2 className="title-editorial-hero text-3xl mb-2">¡Fichas Generadas!</h2>
             <p className="text-[#475569] max-w-md mb-8 text-sm">{message?.text}</p>
-            <div className="flex items-center gap-3">
-              <button onClick={handleNuevaCarga} className="btn-creative btn-next">
-                Nueva Carga Continua
-              </button>
-              <button onClick={onBack} className="btn-creative btn-back">
-                Volver al Estudio
-              </button>
-            </div>
+            <button onClick={handleNuevaCarga} className="btn-creative btn-next px-8">
+              + Nueva Ficha
+            </button>
           </div>
         )}
 
         {step < 4 && (
-          <div className="mt-8 pt-5 border-t border-[#f1f5f9] flex items-center justify-between gap-4">
+          <div className="mt-8 pt-5 border-t border-[#f1f5f9] flex gap-3">
             <button
               type="button"
               onClick={() => setStep(s => s - 1)}
               disabled={step === 1}
-              className="btn-creative btn-back disabled:opacity-0"
+              className="btn-creative btn-back flex-1 disabled:opacity-0 disabled:pointer-events-none"
             >
-              <ChevronLeft className="w-4 h-4" /> Anterior
+              <ChevronLeft className="w-4 h-4" /> Atrás
             </button>
-
             {step < 3 ? (
               <button
                 type="button"
                 onClick={() => setStep(s => s + 1)}
-                className="btn-creative btn-next"
+                className="btn-creative btn-next flex-1"
               >
-                Siguiente Paso <ChevronRight className="w-4 h-4" />
+                Continuar <ChevronRight className="w-4 h-4" />
               </button>
             ) : (
               <button
                 type="button"
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="btn-creative btn-next bg-[#10b981] hover:bg-[#059669]"
+                className="btn-creative flex-[2] bg-[#000000] text-white hover:bg-[#1e293b]"
               >
                 {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                <span>Generar Lote ({telasSeleccionadas.length} Fichas)</span>
+                <span className="mono-tabular">Generar {telasSeleccionadas.length} Fichas</span>
               </button>
             )}
           </div>
         )}
-
-        {/* Editorial Card Footer with the 3 Brand Logos */}
-        <footer className="login-footer-brands mt-6 pt-4">
-          <div className="login-brands-track">
-            <img src="/ag-b.png" alt="AG LAB" className="brand-foot-logo logo-agb" style={{ maxHeight: '28px' }} />
-            <span className="brand-foot-divider" />
-            <img src="/AZZORTI.png" alt="AZZORTI" className="brand-foot-logo logo-azzorti" style={{ maxHeight: '16px' }} />
-            <span className="brand-foot-divider" />
-            <img src="/LIVVA.png" alt="LIVVA" className="brand-foot-logo logo-livva" style={{ maxHeight: '15px' }} />
-          </div>
-        </footer>
       </div>
+
+      {/* Official Logos Showcase at Bottom Center */}
+      <footer className="mt-8 flex justify-center">
+        <div className="inline-flex items-center justify-center gap-6 px-7 py-3.5 rounded-2xl bg-[#ffffff] border border-[#e2e8f0] shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+          <img src="/ag-b.png" alt="AG LAB" className="official-logo official-logo-ag" />
+          <span className="brand-logos-divider" style={{ height: '24px' }} />
+          <img src="/AZZORTI.png" alt="AZZORTI" className="official-logo official-logo-azzorti" />
+          <span className="brand-logos-divider" style={{ height: '24px' }} />
+          <img src="/LIVVA.png" alt="LIVVA" className="official-logo official-logo-livva" />
+        </div>
+      </footer>
     </div>
   );
 }
